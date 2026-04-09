@@ -29,10 +29,25 @@ npm start
 
 To wire it into an MCP client, see `inspector-config.example.json` for a reference config.
 
+## 3D schema visualizer
+
+A small Express-backed web app renders the introspected schema as a 3D force-directed graph with community clustering.
+
+```bash
+./explore.sh          # or: npm run visualize
+```
+
+On first run it fetches `introspection-schema.json` from Atlassian (~30MB, gitignored), then starts the viewer at <http://localhost:4000/schema-3d>.
+
 ## Layout
 
 ```
 index.js                      MCP server entry (stdio transport)
+explore.sh                    Boot script for the 3D visualizer
+explorer-server.js            Express server backing the visualizer
+fetch-introspection.js        One-shot schema fetcher
+schema-3d.html                3D force-directed schema viewer
+graph-clustering.js           Louvain-inspired community detection
 src/
   schema-introspector.js      Runtime GraphQL introspection
   field-categories.json       Regex patterns for semantic grouping
