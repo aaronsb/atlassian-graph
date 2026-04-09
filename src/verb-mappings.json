@@ -1,0 +1,204 @@
+{
+  "verbs": {
+    "search": {
+      "description": "Find and filter content based on search criteria",
+      "patterns": {
+        "fieldName": ["search", "find", "query"],
+        "hasArgs": ["query", "text", "term", "cql", "jql", "filter"],
+        "returnType": ["Connection", "Results", "SearchResult"]
+      },
+      "toolTemplate": {
+        "namePattern": "search-{noun}",
+        "description": "Search {noun} using {searchType} queries",
+        "requiredArgs": ["query"],
+        "optionalArgs": ["limit", "offset", "cloudId"]
+      }
+    },
+    "get": {
+      "description": "Retrieve single item by identifier",
+      "patterns": {
+        "fieldName": ["get", "fetch", "retrieve", "byId", "byKey"],
+        "hasArgs": ["id", "key", "ari", "uuid"],
+        "returnType": ["single", "object", "!Connection"]
+      },
+      "toolTemplate": {
+        "namePattern": "get-{noun}",
+        "description": "Get {noun} by {idType}",
+        "requiredArgs": ["id"],
+        "optionalArgs": ["cloudId"]
+      }
+    },
+    "list": {
+      "description": "Retrieve multiple items with pagination",
+      "patterns": {
+        "fieldName": ["list", "all", "many", "s$"],
+        "hasArgs": ["first", "last", "after", "before", "limit", "offset"],
+        "returnType": ["Connection", "List", "Array"]
+      },
+      "toolTemplate": {
+        "namePattern": "list-{noun}",
+        "description": "List {noun} with pagination support",
+        "requiredArgs": [],
+        "optionalArgs": ["first", "after", "cloudId"]
+      }
+    },
+    "create": {
+      "description": "Create new item",
+      "patterns": {
+        "fieldName": ["create", "add", "new", "insert"],
+        "hasMutation": true,
+        "hasArgs": ["input", "data", "create"]
+      },
+      "toolTemplate": {
+        "namePattern": "create-{noun}",
+        "description": "Create new {noun}",
+        "requiredArgs": ["input"],
+        "optionalArgs": ["cloudId"]
+      }
+    },
+    "update": {
+      "description": "Update existing item",
+      "patterns": {
+        "fieldName": ["update", "edit", "modify", "change"],
+        "hasMutation": true,
+        "hasArgs": ["id", "input", "data", "update"]
+      },
+      "toolTemplate": {
+        "namePattern": "update-{noun}",
+        "description": "Update existing {noun}",
+        "requiredArgs": ["id", "input"],
+        "optionalArgs": ["cloudId"]
+      }
+    },
+    "delete": {
+      "description": "Delete existing item",
+      "patterns": {
+        "fieldName": ["delete", "remove", "destroy"],
+        "hasMutation": true,
+        "hasArgs": ["id", "key"]
+      },
+      "toolTemplate": {
+        "namePattern": "delete-{noun}",
+        "description": "Delete {noun} by ID",
+        "requiredArgs": ["id"],
+        "optionalArgs": ["cloudId"]
+      }
+    }
+  },
+  "categories": {
+    "core_products": {
+      "nouns": {
+        "jira": ["issues", "projects", "boards", "sprints"],
+        "confluence": ["pages", "spaces", "content", "users"],
+        "bitbucket": ["repositories", "commits", "branches"],
+        "compass": ["services", "metrics", "scorecards"],
+        "trello": ["boards", "cards", "lists"],
+        "opsgenie": ["alerts", "incidents", "teams"]
+      },
+      "priority": ["search", "get", "list"]
+    },
+    "search_discovery": {
+      "nouns": {
+        "search": ["results", "suggestions"],
+        "projects": ["projects"],
+        "knowledge": ["articles"]
+      },
+      "priority": ["search", "list"]
+    },
+    "identity_user": {
+      "nouns": {
+        "user": ["profile", "permissions", "groups"],
+        "tenant": ["contexts", "sites"]
+      },
+      "priority": ["get", "list", "search"]
+    },
+    "project_work": {
+      "nouns": {
+        "project": ["updates", "roadmaps"],
+        "work": ["suggestions", "boards"]
+      },
+      "priority": ["get", "list", "search"]
+    },
+    "content_knowledge": {
+      "nouns": {
+        "content": ["pages", "templates"],
+        "space": ["permissions", "settings"],
+        "knowledge": ["base", "articles"]
+      },
+      "priority": ["search", "get", "list"]
+    },
+    "development_devops": {
+      "nouns": {
+        "devai": ["sessions", "repos", "agents"],
+        "flow": ["sessions", "workflows"],
+        "repo": ["permissions", "settings"]
+      },
+      "priority": ["get", "list", "search"]
+    },
+    "ai_intelligence": {
+      "nouns": {
+        "ai": ["sessions", "suggestions", "insights"],
+        "rovo": ["agents", "search", "answers"],
+        "intelligence": ["analytics", "recommendations"]
+      },
+      "priority": ["get", "search", "list"]
+    },
+    "collaboration": {
+      "nouns": {
+        "teams": ["members", "channels"],
+        "chat": ["messages", "rooms"],
+        "sharing": ["links", "permissions"]
+      },
+      "priority": ["list", "get", "search"]
+    },
+    "analytics_insights": {
+      "nouns": {
+        "analytics": ["reports", "metrics"],
+        "insights": ["trends", "usage"],
+        "metrics": ["performance", "adoption"]
+      },
+      "priority": ["get", "list", "search"]
+    },
+    "apps_marketplace": {
+      "nouns": {
+        "apps": ["extensions", "integrations"],
+        "marketplace": ["apps", "addons"],
+        "forge": ["extensions", "modules"]
+      },
+      "priority": ["list", "get", "search"]
+    },
+    "administration": {
+      "nouns": {
+        "admin": ["settings", "permissions"],
+        "tenant": ["config", "contexts"],
+        "system": ["status", "diagnostics"]
+      },
+      "priority": ["get", "list"]
+    },
+    "specialized_tools": {
+      "nouns": {
+        "tools": ["features", "utilities"],
+        "studio": ["projects", "contexts"],
+        "polaris": ["views", "tracking"]
+      },
+      "priority": ["get", "list", "search"]
+    },
+    "support_help": {
+      "nouns": {
+        "help": ["articles", "resources"],
+        "support": ["tickets", "knowledge"],
+        "docs": ["articles", "guides"]
+      },
+      "priority": ["search", "get", "list"]
+    }
+  },
+  "rules": {
+    "maxToolsPerCategory": 50,
+    "preferredVerbOrder": ["search", "get", "list", "create", "update", "delete"],
+    "requireCloudId": ["confluence", "jira", "compass"],
+    "defaultPagination": {
+      "first": 25,
+      "limit": 25
+    }
+  }
+}

@@ -1,0 +1,180 @@
+{
+  "version": "1.0.0",
+  "description": "Tool classes aligned with Atlassian's System of Work philosophy",
+  "toolClasses": {
+    "FOUNDATIONAL": {
+      "name": "Foundational Tools",
+      "description": "Core teamwork tools: Jira, Confluence, Loom, and Rovo",
+      "enabled": true,
+      "priority": 1,
+      "products": ["jira", "confluence", "loom", "rovo"],
+      "categories": ["core_products"],
+      "tools": {
+        "jira": {
+          "patterns": ["jira_*", "playbook_*", "glance_*"],
+          "essentials": [
+            "get-jira",
+            "search-jira",
+            "get-issues-by-ids",
+            "get-project-by-id-or-key",
+            "search-field-schemes"
+          ]
+        },
+        "confluence": {
+          "patterns": ["confluence_*"],
+          "essentials": [
+            "get-confluence",
+            "search-core-products",
+            "get-contents",
+            "get-page",
+            "get-space"
+          ]
+        }
+      }
+    },
+    "AI_INTELLIGENCE": {
+      "name": "AI & Automation",
+      "description": "Atlassian Intelligence, Rovo agents, and AI-powered features",
+      "enabled": true,
+      "priority": 2,
+      "products": ["rovo", "atlassian-intelligence"],
+      "categories": ["ai_intelligence"],
+      "tools": {
+        "agents": {
+          "patterns": ["agentStudio_*", "virtualAgent*"],
+          "essentials": [
+            "search-agent-studio-get-agents",
+            "get-virtual-agent",
+            "get-agent-a-i-summarize-issue"
+          ]
+        },
+        "devai": {
+          "patterns": ["devai_*"],
+          "essentials": [
+            "search-devai-autodev-jobs-for-issue",
+            "get-devai-flow-session-resume"
+          ]
+        }
+      }
+    },
+    "SPECIALIZED_SOLUTIONS": {
+      "name": "Specialized Solutions",
+      "description": "IT Service Management, DevOps, Analytics",
+      "enabled": true,
+      "priority": 3,
+      "products": ["jsm", "compass", "opsgenie", "bitbucket"],
+      "categories": ["specialized_tools", "development_devops"],
+      "tools": {
+        "itsm": {
+          "patterns": ["jsm*", "customerService*", "helpObjectStore_*"],
+          "essentials": [
+            "get-jsm-chat",
+            "get-customer-service",
+            "search-help-object-store-search-articles"
+          ]
+        },
+        "devops": {
+          "patterns": ["devOps_*", "compass_*", "bitbucket*"],
+          "essentials": [
+            "get-dev-ops",
+            "get-compass",
+            "search-dev-ops-services"
+          ]
+        }
+      }
+    },
+    "TEAMWORK_GRAPH": {
+      "name": "Teamwork Graph & Platform",
+      "description": "Cross-product search, analytics, and data connectivity",
+      "enabled": true,
+      "priority": 4,
+      "products": ["teamwork-graph", "search", "analytics"],
+      "categories": ["search_discovery", "analytics_insights"],
+      "tools": {
+        "search": {
+          "patterns": ["search_*", "nlpSearch*"],
+          "essentials": [
+            "search-search-discovery",
+            "search-nlp-search",
+            "search-knowledge-base-search-articles"
+          ]
+        },
+        "analytics": {
+          "patterns": ["polaris_*", "mercury_*", "insights*", "contentAnalytics_*"],
+          "essentials": [
+            "get-polaris-insights",
+            "get-content-analytics-views",
+            "get-insights"
+          ]
+        }
+      }
+    },
+    "MARKETPLACE_ECOSYSTEM": {
+      "name": "Marketplace & Apps",
+      "description": "Third-party apps, Forge platform, and ecosystem tools",
+      "enabled": false,
+      "priority": 5,
+      "products": ["marketplace", "forge", "ecosystem"],
+      "categories": ["apps_marketplace"],
+      "tools": {
+        "apps": {
+          "patterns": ["app*", "ecosystem*", "marketplace*", "forge*"],
+          "essentials": [
+            "search-apps",
+            "get-app",
+            "get-ecosystem"
+          ]
+        }
+      }
+    },
+    "ADMINISTRATION": {
+      "name": "Administration & Governance",
+      "description": "Org policies, site settings, and security controls",
+      "enabled": false,
+      "priority": 6,
+      "products": ["admin", "org-policy"],
+      "categories": ["administration"],
+      "tools": {
+        "governance": {
+          "patterns": ["orgPolicy_*", "tenant*", "organization*", "siteSettings*"],
+          "essentials": [
+            "get-organization",
+            "get-site-settings",
+            "get-tenant"
+          ]
+        }
+      }
+    },
+    "COLLABORATION": {
+      "name": "Collaboration Tools",
+      "description": "Loom videos, comments, and team collaboration features",
+      "enabled": true,
+      "priority": 7,
+      "products": ["loom", "collab"],
+      "categories": ["collaboration"],
+      "tools": {
+        "loom": {
+          "patterns": ["loom_*"],
+          "essentials": [
+            "get-loom-video",
+            "search-loom-spaces-search",
+            "get-loom-comments"
+          ]
+        },
+        "collab": {
+          "patterns": ["collab*", "comment*", "stakeholder*"],
+          "essentials": [
+            "search-comments",
+            "get-collab-draft"
+          ]
+        }
+      }
+    }
+  },
+  "configuration": {
+    "maxToolsPerClass": 15,
+    "totalMaxTools": 50,
+    "expansionMode": "dynamic",
+    "fallbackClass": "FOUNDATIONAL"
+  }
+}
