@@ -32,8 +32,8 @@ To wire it into an MCP client, see `inspector-config.example.json` for a referen
 ## Layout
 
 ```
+index.js                      MCP server entry (stdio transport)
 src/
-  index.js                    MCP server entry
   schema-introspector.js      Runtime GraphQL introspection
   field-categories.json       Regex patterns for semantic grouping
   dynamic-tool-generator.js   Verb:noun tool generation
