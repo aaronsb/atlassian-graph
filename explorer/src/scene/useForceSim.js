@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { seedSpherePositions } from './positions.js';
 
 const DEFAULTS = {
@@ -17,6 +17,7 @@ const DEFAULTS = {
 export function useForceSim(nodes, edges, params = {}) {
   const cfg = { ...DEFAULTS, ...params };
   const nodeCount = nodes.length;
+  const invalidate = useThree(state => state.invalidate);
 
   const positionsRef = useRef(null);
   const velocitiesRef = useRef(null);
@@ -52,6 +53,8 @@ export function useForceSim(nodes, edges, params = {}) {
       dirtyRef.current = false;
       return;
     }
+    // Demand-mode render loop: keep pumping frames while the sim is active.
+    invalidate();
 
     const positions = positionsRef.current;
     const velocities = velocitiesRef.current;
@@ -133,11 +136,12 @@ export function useForceSim(nodes, edges, params = {}) {
     }
   });
 
-  const reheat = () => {
+  const reheat = useCallback(() => {
     alphaRef.current = cfg.alphaInitial;
     setAlphaDisplay(cfg.alphaInitial);
     dirtyRef.current = true;
-  };
+    invalidate();
+  }, [cfg.alphaInitial, invalidate]);
 
   return { positionsRef, dirtyRef, alpha: alphaDisplay, reheat };
 }

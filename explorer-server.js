@@ -319,7 +319,9 @@ app.post('/api/parse-query', (req, res) => {
 
   const operations = [];
   const touchpoints = [];
+  const unresolved = [];
   const seenTouchpoints = new Set();
+  const seenUnresolved = new Set();
   const typeInfo = new TypeInfo(clientSchema);
 
   try {
@@ -333,7 +335,19 @@ app.post('/api/parse-query', (req, res) => {
       Field(node) {
         const parentType = typeInfo.getParentType();
         const fieldDef = typeInfo.getFieldDef();
-        if (!parentType || !fieldDef) return;
+        if (!parentType || !fieldDef) {
+          // Field name exists in the query but TypeInfo couldn't resolve it
+          // against the schema — typo, wrong parent, deprecated-then-removed,
+          // etc. Surface it so the workbench can lint rather than silently drop.
+          const fieldName = node.name?.value;
+          if (!fieldName) return;
+          const parentName = parentType ? parentType.name : null;
+          const key = `${parentName || '?'}.${fieldName}`;
+          if (seenUnresolved.has(key)) return;
+          seenUnresolved.add(key);
+          unresolved.push({ parentType: parentName, field: fieldName });
+          return;
+        }
         const returnNamed = getNamedType(typeInfo.getType());
         const key = `${parentType.name}.${fieldDef.name}`;
         if (seenTouchpoints.has(key)) return;
@@ -351,6 +365,7 @@ app.post('/api/parse-query', (req, res) => {
       error: err.message,
       operations,
       touchpoints,
+      unresolved,
     });
   }
 
@@ -358,6 +373,7 @@ app.post('/api/parse-query', (req, res) => {
     ok: true,
     operations,
     touchpoints,
+    unresolved,
     typeCount: new Set(touchpoints.flatMap(t => [t.parentType, t.returns].filter(Boolean))).size,
   });
 });
@@ -513,7 +529,11 @@ app.delete('/api/specs/:name', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'schema-graph.html'));
+  res.type('text/plain').send(
+    'atlassian-graph API is live on port ' + PORT + '.\n' +
+    'The interactive UI runs on Vite at http://localhost:5173/ (start with `./graph dev`).\n' +
+    'For a list of API endpoints see the README or curl /api/stats.\n'
+  );
 });
 
 function renderReturn(typeRef) {
@@ -536,7 +556,9 @@ async function start() {
   clientSchema = buildClientSchema(data.data ? data.data : data);
   console.log('Built client schema for query parsing');
 
-  app.listen(PORT, () => {
+  // Bind to loopback only: this server proxies Atlassian credentials through
+  // POST /api/query, so we don't want other machines on the LAN hitting it.
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`Explorer: http://localhost:${PORT}/`);
     console.log('Press Ctrl+C to stop');
   });

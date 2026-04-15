@@ -229,7 +229,6 @@ export function createIndex(schemaData) {
       const queue = [{ type: from, path: [], visited: new Set([from]) }];
       while (queue.length && results.length < maxResults) {
         const { type, path, visited } = queue.shift();
-        if (path.length >= maxHops) continue;
         const out = outgoingByType.get(type) || [];
         for (const e of out) {
           const step = { parent: type, field: e.field, to: e.to };
@@ -240,6 +239,7 @@ export function createIndex(schemaData) {
             continue;
           }
           if (visited.has(e.to)) continue;
+          // Only extend if the next hop still fits under maxHops.
           if (path.length + 1 >= maxHops) continue;
           const newVisited = new Set(visited);
           newVisited.add(e.to);

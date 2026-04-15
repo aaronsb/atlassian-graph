@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { colorFor } from './categoryColors.js';
 
 export function Edges({ nodes, edges, positionsRef, highlightedEdges }) {
   const geomRef = useRef();
+  const invalidate = useThree(state => state.invalidate);
 
   const { geometry, material, indexPairs, edgeRecords } = useMemo(() => {
     const nodeIndex = new Map();
@@ -42,6 +43,16 @@ export function Edges({ nodes, edges, positionsRef, highlightedEdges }) {
     return { geometry: geom, material: mat, indexPairs: pairs, edgeRecords: records };
   }, [nodes, edges]);
 
+  // Dispose the previous geometry/material pair when inputs change or we unmount.
+  // No-op during the common case (nodes/edges load once), but prevents a GPU
+  // leak once the cap control re-fetches the graph with a different node count.
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      material.dispose();
+    };
+  }, [geometry, material]);
+
   useEffect(() => {
     const colAttr = geometry.getAttribute('color');
     if (!colAttr) return;
@@ -70,7 +81,8 @@ export function Edges({ nodes, edges, positionsRef, highlightedEdges }) {
       arr[i * 6 + 5] = tc.b * mul;
     }
     colAttr.needsUpdate = true;
-  }, [geometry, edgeRecords, indexPairs, highlightedEdges, nodes]);
+    invalidate();
+  }, [geometry, edgeRecords, indexPairs, highlightedEdges, nodes, invalidate]);
 
   useFrame(() => {
     const positions = positionsRef.current;

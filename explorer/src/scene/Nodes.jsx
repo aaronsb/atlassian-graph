@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { colorFor } from './categoryColors.js';
 
@@ -11,6 +11,7 @@ const tmpColor = new THREE.Color();
 
 export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, onSelect, onHover, highlightedTypes }) {
   const meshRef = useRef();
+  const invalidate = useThree(state => state.invalidate);
 
   const scales = useMemo(() => {
     const out = new Float32Array(nodes.length);
@@ -58,7 +59,8 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
       mesh.setColorAt(i, tmpColor);
     }
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [nodes, selectedId, hoveredId, highlightedTypes]);
+    invalidate();
+  }, [nodes, selectedId, hoveredId, highlightedTypes, invalidate]);
 
   return (
     <instancedMesh
@@ -78,6 +80,10 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
       }}
     >
       <icosahedronGeometry args={[1, 1]} />
+      {/* vertexColors=false is intentional: per-instance colors come from
+          setColorAt/instanceColor, which three injects via the USE_INSTANCING_COLOR
+          shader chunk independent of the vertexColors flag. Switching to a
+          lit material (MeshStandardMaterial, etc.) silently breaks this. */}
       <meshBasicMaterial vertexColors={false} />
     </instancedMesh>
   );
