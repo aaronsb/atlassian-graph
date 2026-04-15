@@ -1,0 +1,84 @@
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { colorFor } from './categoryColors.js';
+
+const tmpMat = new THREE.Matrix4();
+const tmpQuat = new THREE.Quaternion();
+const tmpScale = new THREE.Vector3();
+const tmpPos = new THREE.Vector3();
+const tmpColor = new THREE.Color();
+
+export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, onSelect, onHover, highlightedTypes }) {
+  const meshRef = useRef();
+
+  const scales = useMemo(() => {
+    const out = new Float32Array(nodes.length);
+    for (let i = 0; i < nodes.length; i++) {
+      out[i] = 0.8 + Math.sqrt(nodes[i].degree || 1) * 0.3;
+    }
+    return out;
+  }, [nodes]);
+
+  useFrame(() => {
+    if (!meshRef.current) return;
+    const positions = positionsRef.current;
+    if (!positions) return;
+    const mesh = meshRef.current;
+    const hasHighlight = highlightedTypes && highlightedTypes.size > 0;
+    for (let i = 0; i < nodes.length; i++) {
+      tmpPos.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+      const boost = hasHighlight && highlightedTypes.has(nodes[i].name) ? 1.8 : 1.0;
+      tmpScale.setScalar(scales[i] * boost);
+      tmpMat.compose(tmpPos, tmpQuat, tmpScale);
+      mesh.setMatrixAt(i, tmpMat);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  useEffect(() => {
+    if (!meshRef.current) return;
+    const mesh = meshRef.current;
+    const hasHighlight = highlightedTypes && highlightedTypes.size > 0;
+    const hasFocus = !!(selectedId || hoveredId);
+    const dimmingActive = hasHighlight || hasFocus;
+    for (let i = 0; i < nodes.length; i++) {
+      const id = nodes[i].name;
+      const base = colorFor(nodes[i].category);
+      tmpColor.set(base);
+      if (selectedId === id) {
+        tmpColor.multiplyScalar(1.6);
+      } else if (hoveredId === id) {
+        tmpColor.multiplyScalar(1.3);
+      } else if (hasHighlight && highlightedTypes.has(id)) {
+        // Highlighted: leave at full brightness (1.0). The ceiling is the ceiling.
+      } else if (dimmingActive) {
+        tmpColor.multiplyScalar(hasHighlight ? 0.12 : 0.45);
+      }
+      mesh.setColorAt(i, tmpColor);
+    }
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [nodes, selectedId, hoveredId, highlightedTypes]);
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, nodes.length]}
+      onPointerOver={e => {
+        e.stopPropagation();
+        if (e.instanceId != null) onHover?.(nodes[e.instanceId].name);
+      }}
+      onPointerOut={e => {
+        e.stopPropagation();
+        onHover?.(null);
+      }}
+      onClick={e => {
+        e.stopPropagation();
+        if (e.instanceId != null) onSelect?.(nodes[e.instanceId].name);
+      }}
+    >
+      <icosahedronGeometry args={[1, 1]} />
+      <meshBasicMaterial vertexColors={false} />
+    </instancedMesh>
+  );
+}
