@@ -143,5 +143,15 @@ export function useForceSim(nodes, edges, params = {}) {
     invalidate();
   }, [cfg.alphaInitial, invalidate]);
 
-  return { positionsRef, dirtyRef, alpha: alphaDisplay, reheat };
+  const freeze = useCallback(() => {
+    alphaRef.current = 0;
+    setAlphaDisplay(0);
+    // zero velocities so resumes start cold, not coasting
+    const vel = velocitiesRef.current;
+    if (vel) vel.fill(0);
+    dirtyRef.current = false;
+    invalidate();
+  }, [invalidate]);
+
+  return { positionsRef, dirtyRef, alpha: alphaDisplay, reheat, freeze };
 }

@@ -8,7 +8,7 @@ import { QueryPanel } from './QueryPanel.jsx';
 const CAP_PRESETS = [250, 500, 1000, 2000, 5000];
 const CAP_MAX = 99999; // effectively "all" — more than the total filtered nodes
 
-function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCap, onReheat }) {
+function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCap, onReheat, onFreeze }) {
   const offScene = useMemo(() => {
     if (!touchpoints || !knownTypes || knownTypes.size === 0) return 0;
     let n = 0;
@@ -114,19 +114,32 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
             ⚠ max
           </button>
         </div>
-        <button
-          onClick={onReheat}
-          style={{
-            background: '#26263a', color: '#d7d7e0',
-            border: '1px solid #3a3a52',
-            padding: '2px 8px', borderRadius: 2,
-            fontSize: 10, cursor: 'pointer',
-            marginLeft: 'auto',
-          }}
-          title="Reheat the force simulation"
-        >
-          ↻ reheat
-        </button>
+        <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+          <button
+            onClick={onReheat}
+            style={{
+              background: '#26263a', color: '#d7d7e0',
+              border: '1px solid #3a3a52',
+              padding: '2px 8px', borderRadius: 2,
+              fontSize: 10, cursor: 'pointer',
+            }}
+            title="Reheat the force simulation"
+          >
+            ↻ reheat
+          </button>
+          <button
+            onClick={onFreeze}
+            style={{
+              background: '#26263a', color: '#d7d7e0',
+              border: '1px solid #3a3a52',
+              padding: '2px 8px', borderRadius: 2,
+              fontSize: 10, cursor: 'pointer',
+            }}
+            title="Freeze the simulation in place"
+          >
+            ❄ freeze
+          </button>
+        </div>
       </div>
 
       {cap > 2000 && (
@@ -144,7 +157,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [touchpoints, setTouchpoints] = useState([]);
-  const simRef = useRef({ reheat: () => {}, alpha: 1 });
+  const simRef = useRef({ reheat: () => {}, freeze: () => {}, alpha: 1 });
 
   const knownTypes = useMemo(
     () => new Set(graph.nodes ? graph.nodes.map(n => n.name) : []),
@@ -153,6 +166,7 @@ export default function App() {
 
   const handleTouchpoints = useCallback(tps => setTouchpoints(tps), []);
   const handleReheat = useCallback(() => simRef.current.reheat?.(), []);
+  const handleFreeze = useCallback(() => simRef.current.freeze?.(), []);
 
   // Clear selection when the cap changes and the previously-selected node is
   // pruned out of the scene — prevents a ghost selection in the HUD.
@@ -173,6 +187,7 @@ export default function App() {
         cap={cap}
         setCap={setCap}
         onReheat={handleReheat}
+        onFreeze={handleFreeze}
       />
       <div style={{ position: 'fixed', top: 0, bottom: 320, left: 0, right: 380 }}>
         <Canvas frameloop="demand" camera={{ position: [0, 0, 300], fov: 55, far: 10000 }}>

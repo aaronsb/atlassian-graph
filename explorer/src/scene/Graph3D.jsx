@@ -36,8 +36,8 @@ export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover
   // to live inside Canvas (it calls useFrame), so the App HUD can't call its
   // return value directly — it reads from this ref.
   useEffect(() => {
-    if (simRef) simRef.current = { reheat: sim.reheat, alpha: sim.alpha };
-  }, [simRef, sim.reheat, sim.alpha]);
+    if (simRef) simRef.current = { reheat: sim.reheat, freeze: sim.freeze, alpha: sim.alpha };
+  }, [simRef, sim.reheat, sim.freeze, sim.alpha]);
 
   const nameIndex = useMemo(() => {
     const m = new Map();
