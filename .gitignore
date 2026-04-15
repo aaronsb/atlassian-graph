@@ -5,7 +5,9 @@ node_modules/
 .env
 .env.local
 .env.*.local
-inspector-config.json
+
+# Per-developer scratch specs (real specs are checked in)
+specs/*.local.json
 
 # Editor & OS
 .vscode/
