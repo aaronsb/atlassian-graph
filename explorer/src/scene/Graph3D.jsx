@@ -3,6 +3,10 @@ import { Html, OrbitControls } from '@react-three/drei';
 import { Nodes } from './Nodes.jsx';
 import { Edges } from './Edges.jsx';
 import { useForceSim } from './useForceSim.js';
+import { useGpuForceSim, gpuSimSupported } from './useGpuForceSim.js';
+
+// Module-scope choice — satisfies hooks rules (stable hook identity across renders).
+const useSim = gpuSimSupported ? useGpuForceSim : useForceSim;
 
 function Label({ name, positionsRef, index, variant }) {
   if (index == null || index < 0) return null;
@@ -30,7 +34,7 @@ function Label({ name, positionsRef, index, variant }) {
 }
 
 export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover, touchpoints, simRef }) {
-  const sim = useForceSim(nodes, edges);
+  const sim = useSim(nodes, edges);
 
   // Expose the sim controls to callers outside the Canvas tree. useForceSim has
   // to live inside Canvas (it calls useFrame), so the App HUD can't call its

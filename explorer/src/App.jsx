@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useSchemaGraph } from './hooks/useSchemaGraph.js';
 import { Graph3D } from './scene/Graph3D.jsx';
+import { gpuSimSupported } from './scene/useGpuForceSim.js';
 import { Sidebar } from './Sidebar.jsx';
 import { QueryPanel } from './QueryPanel.jsx';
 
@@ -32,7 +33,25 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
       zIndex: 10,
       minWidth: 240,
     }}>
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>Atlassian Graph Explorer</div>
+      <div style={{ fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span>Atlassian Graph Explorer</span>
+        <span
+          title={gpuSimSupported ? 'Force sim running on GPU' : 'Force sim running on CPU (WebGL2 float RT unavailable)'}
+          style={{
+            fontSize: 9,
+            fontWeight: 600,
+            padding: '1px 5px',
+            borderRadius: 2,
+            background: gpuSimSupported ? '#1d3a1d' : '#3a1d1d',
+            color: gpuSimSupported ? '#8ee68e' : '#ffa8a8',
+            border: '1px solid ' + (gpuSimSupported ? '#2f5a2f' : '#5a2f2f'),
+            fontFamily: 'SF Mono, Menlo, monospace',
+            letterSpacing: 0.3,
+          }}
+        >
+          {gpuSimSupported ? 'GPU' : 'CPU'}
+        </span>
+      </div>
       <div style={{ color: '#7a7a92', fontSize: 11 }}>
         {graph.loading && 'Loading graph…'}
         {graph.error && <span style={{ color: '#ff6b9d' }}>Error: {graph.error}</span>}
@@ -101,7 +120,9 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
           ))}
           <button
             onClick={() => setCap(CAP_MAX)}
-            title="Load all available types. Expensive — the CPU force sim crawls past a few thousand nodes."
+            title={gpuSimSupported
+              ? 'Load all available types.'
+              : 'Load all available types. Expensive — the CPU force sim crawls past a few thousand nodes.'}
             style={{
               background: cap === CAP_MAX ? '#ffa8a8' : '#26263a',
               color: cap === CAP_MAX ? '#000' : '#ffa8a8',
@@ -142,7 +163,7 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
         </div>
       </div>
 
-      {cap > 2000 && (
+      {cap > 2000 && !gpuSimSupported && (
         <div style={{ color: '#ffa8a8', fontSize: 10, marginTop: 6 }}>
           CPU sim gets slow past ~2000 nodes.
         </div>
