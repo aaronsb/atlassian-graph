@@ -341,7 +341,7 @@ export default function App() {
         style={{ position: 'fixed', top: 0, bottom: 320, left: 0, right: 380 }}
         onContextMenu={e => e.preventDefault()}
       >
-        <Canvas frameloop="demand" camera={{ position: [0, 0, 300], fov: 55, far: 10000 }}>
+        <Canvas frameloop="demand" flat camera={{ position: [0, 0, 300], fov: 55, far: 10000 }}>
           {graph.nodes && (
             <Graph3D
               nodes={graph.nodes}

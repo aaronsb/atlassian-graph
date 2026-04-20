@@ -8,6 +8,43 @@ import { useGpuForceSim, gpuSimSupported } from './useGpuForceSim.js';
 // Module-scope choice — satisfies hooks rules (stable hook identity across renders).
 const useSim = gpuSimSupported ? useGpuForceSim : useForceSim;
 
+// Viewport-space selection marker: constant pixel size regardless of zoom or
+// depth. Four corner brackets + a soft center ring, rendered via <Html> so
+// the DOM does the compositing and the caret is crisp at any camera distance.
+function CaretMarker({ positionsRef, index }) {
+  if (index == null || index < 0) return null;
+  const positions = positionsRef.current;
+  if (!positions) return null;
+  const pos = [positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]];
+  const corner = {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderColor: '#ffffff',
+    borderStyle: 'solid',
+    filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.9)) drop-shadow(0 0 18px rgba(255,255,255,0.5))',
+  };
+  return (
+    <Html position={pos} center zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
+      <div style={{ position: 'relative', width: 52, height: 52 }}>
+        <div style={{ ...corner, top: 0,    left: 0,    borderWidth: '2px 0 0 2px' }} />
+        <div style={{ ...corner, top: 0,    right: 0,   borderWidth: '2px 2px 0 0' }} />
+        <div style={{ ...corner, bottom: 0, left: 0,    borderWidth: '0 0 2px 2px' }} />
+        <div style={{ ...corner, bottom: 0, right: 0,   borderWidth: '0 2px 2px 0' }} />
+        <div style={{
+          position: 'absolute',
+          top: '50%', left: '50%',
+          width: 22, height: 22,
+          transform: 'translate(-50%, -50%)',
+          border: '1px solid rgba(255,255,255,0.85)',
+          borderRadius: '50%',
+          boxShadow: '0 0 10px rgba(255,255,255,0.6), inset 0 0 6px rgba(255,255,255,0.25)',
+        }} />
+      </div>
+    </Html>
+  );
+}
+
 function Label({ name, positionsRef, index, variant }) {
   if (index == null || index < 0) return null;
   const positions = positionsRef.current;
@@ -99,7 +136,10 @@ export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover
         highlightedTypes={highlightedTypes}
       />
       {selectedId && selectedIdx != null && (
-        <Label name={selectedId} positionsRef={sim.positionsRef} index={selectedIdx} variant="selected" />
+        <>
+          <CaretMarker positionsRef={sim.positionsRef} index={selectedIdx} />
+          <Label name={selectedId} positionsRef={sim.positionsRef} index={selectedIdx} variant="selected" />
+        </>
       )}
       {hoveredId && hoveredId !== selectedId && hoveredIdx != null && (
         <Label name={hoveredId} positionsRef={sim.positionsRef} index={hoveredIdx} variant="hover" />

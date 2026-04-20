@@ -47,27 +47,15 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
   useEffect(() => {
     if (!meshRef.current) return;
     const mesh = meshRef.current;
-    const hasHighlight = highlightedTypes && highlightedTypes.size > 0;
-    const hasFocus = !!(selectedId || hoveredId);
-    const dimmingActive = hasHighlight || hasFocus;
+    // Every node renders at its palette hex. Selection is signalled by the
+    // screen-space caret overlay, hover by the label — colors never change.
     for (let i = 0; i < nodes.length; i++) {
-      const id = nodes[i].name;
-      const base = colorFor(nodes[i].category);
-      tmpColor.set(base);
-      if (selectedId === id) {
-        tmpColor.multiplyScalar(1.6);
-      } else if (hoveredId === id) {
-        tmpColor.multiplyScalar(1.3);
-      } else if (hasHighlight && highlightedTypes.has(id)) {
-        // Highlighted: leave at full brightness (1.0). The ceiling is the ceiling.
-      } else if (dimmingActive) {
-        tmpColor.multiplyScalar(hasHighlight ? 0.12 : 0.45);
-      }
+      tmpColor.set(colorFor(nodes[i].category));
       mesh.setColorAt(i, tmpColor);
     }
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     invalidate();
-  }, [nodes, selectedId, hoveredId, highlightedTypes, invalidate]);
+  }, [nodes, invalidate]);
 
   return (
     <instancedMesh

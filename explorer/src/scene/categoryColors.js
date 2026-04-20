@@ -1,24 +1,24 @@
-// Bright, saturated palette — picked to stay vivid on the dark background
-// even after the dim/focus multipliers in Nodes/Edges knock them down.
-// No dark or desaturated entries: every category gets a color that reads
-// cleanly at full brightness and still has legs at 12% dim.
+// Strong 8-bit / VGA vibes — every color is max saturation (one channel at
+// 0, another at 0xFF). Hues are spaced around the wheel so adjacent
+// categories don't collide. Renders as literal hex because the Canvas has
+// tone mapping disabled (flat) and materials have toneMapped:false.
 export const CATEGORY_COLORS = {
-  core_products:      '#4dabf7', // blue
-  identity_user:      '#ff6b9d', // pink
-  search_discovery:   '#ffd43b', // yellow
-  development_devops: '#51cf66', // green
-  project_work:       '#ff922b', // orange
-  content_knowledge:  '#22d3ee', // cyan
-  ai_intelligence:    '#c084fc', // purple
-  apps_marketplace:   '#f472b6', // rose
-  feeds_activity:     '#2dd4bf', // teal
-  analytics_insights: '#fbbf24', // amber
-  collaboration:      '#a3e635', // lime
-  administration:     '#fb7185', // coral
-  specialized_tools:  '#e879f9', // magenta
-  support_help:       '#fb923c', // peach
-  meta_system:        '#818cf8', // indigo
-  uncategorized:      '#94a3b8', // slate — neutral but still on the bright side
+  core_products:      '#0080FF', // azure blue
+  identity_user:      '#FF0080', // hot pink
+  search_discovery:   '#FFFF00', // pure yellow
+  development_devops: '#00FF00', // pure green
+  project_work:       '#FF8000', // orange
+  content_knowledge:  '#00FFFF', // pure cyan
+  ai_intelligence:    '#8000FF', // violet
+  apps_marketplace:   '#FF00FF', // pure magenta
+  feeds_activity:     '#00FF80', // spring green
+  analytics_insights: '#FFBF00', // amber / gold
+  collaboration:      '#80FF00', // chartreuse / lime
+  administration:     '#FF0000', // pure red
+  specialized_tools:  '#BF00FF', // grape
+  support_help:       '#FF4000', // red-orange
+  meta_system:        '#0000FF', // pure blue
+  uncategorized:      '#808080', // neutral gray — stays out of the hue wheel
 };
 
 export function colorFor(category) {
