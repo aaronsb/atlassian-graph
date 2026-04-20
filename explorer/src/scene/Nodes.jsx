@@ -9,7 +9,7 @@ const tmpScale = new THREE.Vector3();
 const tmpPos = new THREE.Vector3();
 const tmpColor = new THREE.Color();
 
-export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, onSelect, onHover, highlightedTypes }) {
+export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, onSelect, onHover, onHide, hiddenIds, highlightedTypes }) {
   const meshRef = useRef();
   const invalidate = useThree(state => state.invalidate);
 
@@ -27,10 +27,17 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
     if (!positions) return;
     const mesh = meshRef.current;
     const hasHighlight = highlightedTypes && highlightedTypes.size > 0;
+    const hasHidden = hiddenIds && hiddenIds.size > 0;
     for (let i = 0; i < nodes.length; i++) {
       tmpPos.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-      const boost = hasHighlight && highlightedTypes.has(nodes[i].name) ? 1.8 : 1.0;
-      tmpScale.setScalar(scales[i] * boost);
+      if (hasHidden && hiddenIds.has(nodes[i].name)) {
+        // Zero scale collapses the icosahedron to a point — invisible and
+        // not pickable, while leaving the physics index untouched.
+        tmpScale.setScalar(0);
+      } else {
+        const boost = hasHighlight && highlightedTypes.has(nodes[i].name) ? 1.8 : 1.0;
+        tmpScale.setScalar(scales[i] * boost);
+      }
       tmpMat.compose(tmpPos, tmpQuat, tmpScale);
       mesh.setMatrixAt(i, tmpMat);
     }
@@ -68,7 +75,10 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
       args={[undefined, undefined, nodes.length]}
       onPointerOver={e => {
         e.stopPropagation();
-        if (e.instanceId != null) onHover?.(nodes[e.instanceId].name);
+        if (e.instanceId == null) return;
+        const name = nodes[e.instanceId].name;
+        if (hiddenIds && hiddenIds.has(name)) return;
+        onHover?.(name);
       }}
       onPointerOut={e => {
         e.stopPropagation();
@@ -76,7 +86,18 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
       }}
       onClick={e => {
         e.stopPropagation();
-        if (e.instanceId != null) onSelect?.(nodes[e.instanceId].name);
+        if (e.instanceId == null) return;
+        const name = nodes[e.instanceId].name;
+        if (hiddenIds && hiddenIds.has(name)) return;
+        onSelect?.(name);
+      }}
+      onContextMenu={e => {
+        e.stopPropagation();
+        e.nativeEvent.preventDefault();
+        if (e.instanceId == null) return;
+        const name = nodes[e.instanceId].name;
+        if (hiddenIds && hiddenIds.has(name)) return;
+        onHide?.(name);
       }}
     >
       <icosahedronGeometry args={[1, 1]} />

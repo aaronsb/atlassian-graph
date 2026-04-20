@@ -15,7 +15,8 @@ const DEFAULTS = {
 };
 
 export function useForceSim(nodes, edges, params = {}) {
-  const cfg = { ...DEFAULTS, ...params };
+  const { hiddenIds, ...tuning } = params;
+  const cfg = { ...DEFAULTS, ...tuning };
   const nodeCount = nodes.length;
   const invalidate = useThree(state => state.invalidate);
 
@@ -65,11 +66,17 @@ export function useForceSim(nodes, edges, params = {}) {
     const { repulsion, attraction, damping, dt, centerGravity, maxForce } = cfg;
 
     const forces = new Float32Array(N * 3);
+    const hasHidden = hiddenIds && hiddenIds.size > 0;
+    const isHidden = hasHidden
+      ? (i) => hiddenIds.has(nodes[i].name)
+      : () => false;
 
     for (let i = 0; i < N; i++) {
+      if (isHidden(i)) continue;
       const ix3 = i * 3;
       const xi = positions[ix3], yi = positions[ix3 + 1], zi = positions[ix3 + 2];
       for (let j = i + 1; j < N; j++) {
+        if (isHidden(j)) continue;
         const jx3 = j * 3;
         const dx = xi - positions[jx3];
         const dy = yi - positions[jx3 + 1];
@@ -97,6 +104,7 @@ export function useForceSim(nodes, edges, params = {}) {
     for (let e = 0; e < eLen; e += 2) {
       const a = edgeIdx[e];
       const b = edgeIdx[e + 1];
+      if (isHidden(a) || isHidden(b)) continue;
       const ax = a * 3, bx = b * 3;
       const dx = positions[bx]     - positions[ax];
       const dy = positions[bx + 1] - positions[ax + 1];
@@ -110,6 +118,7 @@ export function useForceSim(nodes, edges, params = {}) {
     }
 
     for (let i = 0; i < N; i++) {
+      if (isHidden(i)) continue;
       const ix3 = i * 3;
       let fx = forces[ix3] * alpha;
       let fy = forces[ix3 + 1] * alpha;

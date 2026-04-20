@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { colorFor } from './categoryColors.js';
 
-export function Edges({ nodes, edges, positionsRef, highlightedEdges }) {
+export function Edges({ nodes, edges, positionsRef, highlightedEdges, hiddenIds }) {
   const geomRef = useRef();
   const invalidate = useThree(state => state.invalidate);
 
@@ -90,9 +90,25 @@ export function Edges({ nodes, edges, positionsRef, highlightedEdges }) {
     const posAttr = geomRef.current.geometry.getAttribute('position');
     const arr = posAttr.array;
     const pairCount = indexPairs.length / 2;
+    const hasHidden = hiddenIds && hiddenIds.size > 0;
     for (let i = 0; i < pairCount; i++) {
       const si = indexPairs[i * 2];
       const ti = indexPairs[i * 2 + 1];
+      const sHidden = hasHidden && hiddenIds.has(nodes[si].name);
+      const tHidden = hasHidden && hiddenIds.has(nodes[ti].name);
+      if (sHidden || tHidden) {
+        // Collapse both endpoints to the same point — renders as zero-length
+        // (invisible) without rebuilding geometry on every hide.
+        const keepIdx = sHidden ? ti : si;
+        const k3 = keepIdx * 3;
+        arr[i * 6]     = positions[k3];
+        arr[i * 6 + 1] = positions[k3 + 1];
+        arr[i * 6 + 2] = positions[k3 + 2];
+        arr[i * 6 + 3] = positions[k3];
+        arr[i * 6 + 4] = positions[k3 + 1];
+        arr[i * 6 + 5] = positions[k3 + 2];
+        continue;
+      }
       arr[i * 6]     = positions[si * 3];
       arr[i * 6 + 1] = positions[si * 3 + 1];
       arr[i * 6 + 2] = positions[si * 3 + 2];

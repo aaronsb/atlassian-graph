@@ -33,8 +33,8 @@ function Label({ name, positionsRef, index, variant }) {
   );
 }
 
-export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover, touchpoints, simRef }) {
-  const sim = useSim(nodes, edges);
+export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover, onHide, hiddenIds, touchpoints, simRef }) {
+  const sim = useSim(nodes, edges, { hiddenIds });
 
   // Expose the sim controls to callers outside the Canvas tree. useForceSim has
   // to live inside Canvas (it calls useFrame), so the App HUD can't call its
@@ -84,6 +84,7 @@ export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover
         edges={edges}
         positionsRef={sim.positionsRef}
         highlightedEdges={highlightedEdges}
+        hiddenIds={hiddenIds}
       />
       <Nodes
         nodes={nodes}
@@ -93,6 +94,8 @@ export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover
         hoveredId={hoveredId}
         onSelect={onSelect}
         onHover={onHover}
+        onHide={onHide}
+        hiddenIds={hiddenIds}
         highlightedTypes={highlightedTypes}
       />
       {selectedId && selectedIdx != null && (

@@ -47,6 +47,7 @@ uniform float maxForce;
 uniform int nodeCount;
 uniform sampler2D neighborOffsetCount;
 uniform sampler2D neighborList;
+uniform sampler2D hiddenMask;   // R: 1.0 visible, 0.0 hidden
 uniform vec2 neighborRes;
 
 vec2 idxToUV(int idx, vec2 res) {
@@ -63,6 +64,13 @@ void main() {
     return;
   }
 
+  // Hidden self: freeze. Zero velocity; the position shader also skips integration.
+  float selfVis = texture2D(hiddenMask, uv).r;
+  if (selfVis < 0.5) {
+    gl_FragColor = vec4(0.0);
+    return;
+  }
+
   vec3 pos = texture2D(texturePosition, uv).xyz;
   vec3 vel = texture2D(textureVelocity, uv).xyz;
 
@@ -73,6 +81,7 @@ void main() {
     if (j >= nodeCount) break;
     if (j == myIdx) continue;
     vec2 juv = idxToUV(j, resolution);
+    if (texture2D(hiddenMask, juv).r < 0.5) continue;
     vec3 pj = texture2D(texturePosition, juv).xyz;
     vec3 d = pos - pj;
     float d2 = max(dot(d, d), 0.01);
@@ -80,7 +89,8 @@ void main() {
     force += (d / dist) * (repulsion / d2);
   }
 
-  // Edge attraction via neighbor CSR.
+  // Edge attraction via neighbor CSR. Hidden neighbors are skipped so they
+  // stop pulling the visible graph toward their frozen location.
   vec4 meta = texture2D(neighborOffsetCount, uv);
   int off = int(meta.r + 0.5);
   int cnt = int(meta.g + 0.5);
@@ -90,6 +100,7 @@ void main() {
     vec2 nuv = idxToUV(ni, neighborRes);
     int neighborIdx = int(texture2D(neighborList, nuv).r + 0.5);
     vec2 puv = idxToUV(neighborIdx, resolution);
+    if (texture2D(hiddenMask, puv).r < 0.5) continue;
     vec3 pn = texture2D(texturePosition, puv).xyz;
     vec3 d = pn - pos;
     force += d * attraction;
@@ -111,12 +122,18 @@ void main() {
 const posShaderBody = /* glsl */ `
 uniform float dt;
 uniform int nodeCount;
+uniform sampler2D hiddenMask;
 
 void main() {
   vec2 uv = gl_FragCoord.xy / resolution;
   int myIdx = int(floor(gl_FragCoord.y) * resolution.x + floor(gl_FragCoord.x));
   vec3 pos = texture2D(texturePosition, uv).xyz;
   if (myIdx >= nodeCount) {
+    gl_FragColor = vec4(pos, 1.0);
+    return;
+  }
+  // Hidden nodes freeze in place so the visible graph can flow around them.
+  if (texture2D(hiddenMask, uv).r < 0.5) {
     gl_FragColor = vec4(pos, 1.0);
     return;
   }
@@ -156,7 +173,8 @@ function buildNeighborCSR(nodes, edges) {
 }
 
 export function useGpuForceSim(nodes, edges, params = {}) {
-  const cfg = { ...DEFAULTS, ...params };
+  const { hiddenIds, ...tuning } = params;
+  const cfg = { ...DEFAULTS, ...tuning };
   const gl = useThree(state => state.gl);
   const invalidate = useThree(state => state.invalidate);
   const nodeCount = nodes.length;
@@ -224,6 +242,17 @@ export function useGpuForceSim(nodes, edges, params = {}) {
     offsetCountTex.magFilter = THREE.NearestFilter;
     offsetCountTex.needsUpdate = true;
 
+    // Hidden mask — starts fully visible; updated in-place by a separate
+    // effect when hiddenIds changes (no sim rebuild needed).
+    const maskData = new Float32Array(totalTexels * 4);
+    for (let i = 0; i < nodeCount; i++) maskData[i * 4] = 1.0;
+    const hiddenMaskTex = new THREE.DataTexture(
+      maskData, texW, texH, THREE.RGBAFormat, THREE.FloatType
+    );
+    hiddenMaskTex.minFilter = THREE.NearestFilter;
+    hiddenMaskTex.magFilter = THREE.NearestFilter;
+    hiddenMaskTex.needsUpdate = true;
+
     // #defines for static loop bounds — cheap to recompile per graph load.
     const defines =
       `#define MAX_NODES ${nodeCount}\n` +
@@ -247,10 +276,12 @@ export function useGpuForceSim(nodes, edges, params = {}) {
     vU.neighborOffsetCount = { value: offsetCountTex };
     vU.neighborList = { value: neighborTex };
     vU.neighborRes = { value: new THREE.Vector2(neighborW, neighborH) };
+    vU.hiddenMask = { value: hiddenMaskTex };
 
     const pU = posVar.material.uniforms;
     pU.dt = { value: cfg.dt };
     pU.nodeCount = { value: nodeCount };
+    pU.hiddenMask = { value: hiddenMaskTex };
 
     const err = gpuCompute.init();
     if (err) {
@@ -258,6 +289,7 @@ export function useGpuForceSim(nodes, edges, params = {}) {
       gpuCompute.dispose();
       offsetCountTex.dispose();
       neighborTex.dispose();
+      hiddenMaskTex.dispose();
       gpuStateRef.current = null;
       return;
     }
@@ -281,17 +313,33 @@ export function useGpuForceSim(nodes, edges, params = {}) {
     gpuStateRef.current = {
       gpuCompute, posVar, velVar, readbackBuf,
       texW, texH, N: nodeCount,
-      offsetCountTex, neighborTex, zeroTex,
+      offsetCountTex, neighborTex, zeroTex, hiddenMaskTex,
+      nodes,
     };
 
     return () => {
       gpuCompute.dispose();
       offsetCountTex.dispose();
       neighborTex.dispose();
+      hiddenMaskTex.dispose();
       zeroTex.dispose();
       gpuStateRef.current = null;
     };
   }, [nodes, edges, nodeCount, gl]);
+
+  // Update the hidden mask texture in place whenever hiddenIds flips — avoids
+  // rebuilding the whole simulation (which would re-seed positions).
+  useEffect(() => {
+    const s = gpuStateRef.current;
+    if (!s) return;
+    const data = s.hiddenMaskTex.image.data;
+    for (let i = 0; i < s.N; i++) {
+      const hidden = hiddenIds && hiddenIds.has(s.nodes[i].name);
+      data[i * 4] = hidden ? 0.0 : 1.0;
+    }
+    s.hiddenMaskTex.needsUpdate = true;
+    invalidate();
+  }, [hiddenIds, nodes, invalidate]);
 
   useFrame(() => {
     const s = gpuStateRef.current;

@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { useSchemaGraph } from './hooks/useSchemaGraph.js';
 import { Graph3D } from './scene/Graph3D.jsx';
 import { gpuSimSupported } from './scene/useGpuForceSim.js';
+import { colorFor } from './scene/categoryColors.js';
 import { Sidebar } from './Sidebar.jsx';
 import { QueryPanel } from './QueryPanel.jsx';
 
@@ -172,12 +173,84 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
   );
 }
 
+function HiddenPanel({ hiddenIds, nodes, onUnhide, onUnhideAll }) {
+  if (hiddenIds.size === 0) return null;
+  const byName = new Map();
+  if (nodes) for (const n of nodes) byName.set(n.name, n);
+  const sorted = Array.from(hiddenIds).sort();
+
+  return (
+    <div style={{
+      background: 'rgba(19,19,28,0.9)',
+      border: '1px solid #26263a',
+      padding: '10px 14px',
+      borderRadius: 4,
+      backdropFilter: 'blur(6px)',
+      fontSize: 12,
+      minWidth: 240,
+      maxWidth: 300,
+      maxHeight: 280,
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 6,
+      }}>
+        <span style={{ fontWeight: 600 }}>Hidden ({hiddenIds.size})</span>
+        <button
+          onClick={onUnhideAll}
+          style={{
+            background: '#26263a', color: '#d7d7e0',
+            border: '1px solid #3a3a52',
+            padding: '2px 8px', borderRadius: 2,
+            fontSize: 10, cursor: 'pointer',
+          }}
+          title="Restore every hidden node"
+        >
+          unhide all
+        </button>
+      </div>
+      <div style={{ overflowY: 'auto', flex: 1 }}>
+        {sorted.map(name => {
+          const node = byName.get(name);
+          const swatch = node ? colorFor(node.category) : '#94a3b8';
+          return (
+            <div
+              key={name}
+              onClick={() => onUnhide(name)}
+              title="Click to unhide"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '4px 6px', borderRadius: 2, cursor: 'pointer',
+                fontFamily: 'SF Mono, Menlo, monospace', fontSize: 11,
+                color: '#d7d7e0',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#26263a')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{
+                width: 10, height: 10, borderRadius: 2,
+                background: swatch, flexShrink: 0,
+              }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {name}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [cap, setCap] = useState(500);
   const graph = useSchemaGraph({ cap });
   const [selectedId, setSelectedId] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [touchpoints, setTouchpoints] = useState([]);
+  const [hiddenIds, setHiddenIds] = useState(() => new Set());
   const simRef = useRef({ reheat: () => {}, freeze: () => {}, alpha: 1 });
 
   const knownTypes = useMemo(
@@ -188,6 +261,30 @@ export default function App() {
   const handleTouchpoints = useCallback(tps => setTouchpoints(tps), []);
   const handleReheat = useCallback(() => simRef.current.reheat?.(), []);
   const handleFreeze = useCallback(() => simRef.current.freeze?.(), []);
+  // After any visibility change, kick the sim so the layout can re-settle
+  // around the new set of participating nodes.
+  const handleHide = useCallback(id => {
+    setHiddenIds(s => {
+      if (s.has(id)) return s;
+      const next = new Set(s);
+      next.add(id);
+      return next;
+    });
+    simRef.current.reheat?.();
+  }, []);
+  const handleUnhide = useCallback(id => {
+    setHiddenIds(s => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+    simRef.current.reheat?.();
+  }, []);
+  const handleUnhideAll = useCallback(() => {
+    setHiddenIds(new Set());
+    simRef.current.reheat?.();
+  }, []);
 
   // Clear selection when the cap changes and the previously-selected node is
   // pruned out of the scene — prevents a ghost selection in the HUD.
@@ -197,20 +294,53 @@ export default function App() {
     }
   }, [selectedId, knownTypes]);
 
+  // Clear selection/hover if the target gets hidden — otherwise the HUD shows
+  // a "selected:" for something the user just asked to make invisible.
+  useEffect(() => {
+    if (selectedId && hiddenIds.has(selectedId)) setSelectedId(null);
+    if (hoveredId && hiddenIds.has(hoveredId)) setHoveredId(null);
+  }, [selectedId, hoveredId, hiddenIds]);
+
+  // Drop stale entries if the graph reloads and a hidden name no longer exists.
+  useEffect(() => {
+    if (hiddenIds.size === 0 || knownTypes.size === 0) return;
+    let changed = false;
+    const next = new Set();
+    for (const id of hiddenIds) {
+      if (knownTypes.has(id)) next.add(id);
+      else changed = true;
+    }
+    if (changed) setHiddenIds(next);
+  }, [hiddenIds, knownTypes]);
+
   return (
     <>
-      <HUD
-        graph={graph}
-        selectedId={selectedId}
-        hoveredId={hoveredId}
-        touchpoints={touchpoints}
-        knownTypes={knownTypes}
-        cap={cap}
-        setCap={setCap}
-        onReheat={handleReheat}
-        onFreeze={handleFreeze}
-      />
-      <div style={{ position: 'fixed', top: 0, bottom: 320, left: 0, right: 380 }}>
+      <div style={{
+        position: 'fixed', top: 12, left: 12, zIndex: 10,
+        display: 'flex', flexDirection: 'column', gap: 8,
+      }}>
+        <HUD
+          graph={graph}
+          selectedId={selectedId}
+          hoveredId={hoveredId}
+          touchpoints={touchpoints}
+          knownTypes={knownTypes}
+          cap={cap}
+          setCap={setCap}
+          onReheat={handleReheat}
+          onFreeze={handleFreeze}
+        />
+        <HiddenPanel
+          hiddenIds={hiddenIds}
+          nodes={graph.nodes}
+          onUnhide={handleUnhide}
+          onUnhideAll={handleUnhideAll}
+        />
+      </div>
+      <div
+        style={{ position: 'fixed', top: 0, bottom: 320, left: 0, right: 380 }}
+        onContextMenu={e => e.preventDefault()}
+      >
         <Canvas frameloop="demand" camera={{ position: [0, 0, 300], fov: 55, far: 10000 }}>
           {graph.nodes && (
             <Graph3D
@@ -220,6 +350,8 @@ export default function App() {
               hoveredId={hoveredId}
               onSelect={setSelectedId}
               onHover={setHoveredId}
+              onHide={handleHide}
+              hiddenIds={hiddenIds}
               touchpoints={touchpoints}
               simRef={simRef}
             />
