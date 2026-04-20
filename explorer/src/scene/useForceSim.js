@@ -12,6 +12,10 @@ const DEFAULTS = {
   alphaDecay: 0.0228,
   alphaMin: 0.001,
   alphaInitial: 1.0,
+  alphaSimmer: 0.08,
+  dampingSimmer: 0.70,
+  centerGravitySimmer: 0.03,
+  velStopSimmer: 0.3,
 };
 
 export function useForceSim(nodes, edges, params = {}) {
@@ -27,6 +31,7 @@ export function useForceSim(nodes, edges, params = {}) {
   const [alphaDisplay, setAlphaDisplay] = useState(cfg.alphaInitial);
   const dirtyRef = useRef(false);
   const frameCounterRef = useRef(0);
+  const simmerRef = useRef(false);
 
   useMemo(() => {
     positionsRef.current = seedSpherePositions(nodeCount, Math.max(120, Math.cbrt(nodeCount) * 15));
@@ -63,7 +68,10 @@ export function useForceSim(nodes, edges, params = {}) {
     if (!positions || !velocities || !edgeIdx) return;
 
     const N = nodeCount;
-    const { repulsion, attraction, damping, dt, centerGravity, maxForce } = cfg;
+    const { repulsion, attraction, dt, maxForce } = cfg;
+    const damping = simmerRef.current ? cfg.dampingSimmer : cfg.damping;
+    const centerGravity = simmerRef.current ? cfg.centerGravitySimmer : cfg.centerGravity;
+    const velStop = simmerRef.current ? cfg.velStopSimmer : 0;
 
     const forces = new Float32Array(N * 3);
     const hasHidden = hiddenIds && hiddenIds.size > 0;
@@ -120,23 +128,38 @@ export function useForceSim(nodes, edges, params = {}) {
     for (let i = 0; i < N; i++) {
       if (isHidden(i)) continue;
       const ix3 = i * 3;
-      let fx = forces[ix3] * alpha;
-      let fy = forces[ix3 + 1] * alpha;
-      let fz = forces[ix3 + 2] * alpha;
+      // Cap raw force first, then scale by alpha — mirrors the GPU shader so
+      // alpha actually scales dynamics for high-degree nodes too.
+      let fx = forces[ix3];
+      let fy = forces[ix3 + 1];
+      let fz = forces[ix3 + 2];
       const mag = Math.sqrt(fx * fx + fy * fy + fz * fz);
       if (mag > maxForce) {
         const s = maxForce / mag;
         fx *= s; fy *= s; fz *= s;
       }
-      velocities[ix3]     = (velocities[ix3]     + fx) * damping;
-      velocities[ix3 + 1] = (velocities[ix3 + 1] + fy) * damping;
-      velocities[ix3 + 2] = (velocities[ix3 + 2] + fz) * damping;
+      fx *= alpha; fy *= alpha; fz *= alpha;
+      let nvx = (velocities[ix3]     + fx) * damping;
+      let nvy = (velocities[ix3 + 1] + fy) * damping;
+      let nvz = (velocities[ix3 + 2] + fz) * damping;
+      // Static-friction-style clamp (see GPU shader). Kills low-amplitude
+      // spring oscillations rather than letting them decay asymptotically.
+      if (velStop > 0) {
+        const vm2 = nvx * nvx + nvy * nvy + nvz * nvz;
+        if (vm2 < velStop * velStop) { nvx = 0; nvy = 0; nvz = 0; }
+      }
+      velocities[ix3]     = nvx;
+      velocities[ix3 + 1] = nvy;
+      velocities[ix3 + 2] = nvz;
       positions[ix3]     += velocities[ix3]     * dt;
       positions[ix3 + 1] += velocities[ix3 + 1] * dt;
       positions[ix3 + 2] += velocities[ix3 + 2] * dt;
     }
 
-    alphaRef.current = alpha * (1 - cfg.alphaDecay);
+    // Same decay as GPU hook; simmer floors alpha above alphaMin so the sim
+    // never stops via the early-return.
+    const decayed = alpha * (1 - cfg.alphaDecay);
+    alphaRef.current = simmerRef.current ? Math.max(cfg.alphaSimmer, decayed) : decayed;
     dirtyRef.current = true;
 
     frameCounterRef.current++;
@@ -155,6 +178,7 @@ export function useForceSim(nodes, edges, params = {}) {
   const freeze = useCallback(() => {
     alphaRef.current = 0;
     setAlphaDisplay(0);
+    simmerRef.current = false;
     // zero velocities so resumes start cold, not coasting
     const vel = velocitiesRef.current;
     if (vel) vel.fill(0);
@@ -162,5 +186,17 @@ export function useForceSim(nodes, edges, params = {}) {
     invalidate();
   }, [invalidate]);
 
-  return { positionsRef, dirtyRef, alpha: alphaDisplay, reheat, freeze };
+  const simmer = useCallback(on => {
+    simmerRef.current = on;
+    if (on) {
+      if (alphaRef.current < cfg.alphaSimmer) {
+        alphaRef.current = cfg.alphaSimmer;
+        setAlphaDisplay(cfg.alphaSimmer);
+      }
+      dirtyRef.current = true;
+      invalidate();
+    }
+  }, [cfg.alphaSimmer, invalidate]);
+
+  return { positionsRef, dirtyRef, alpha: alphaDisplay, reheat, freeze, simmer };
 }

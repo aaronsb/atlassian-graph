@@ -14,6 +14,10 @@ const DEFAULTS = {
   alphaDecay: 0.0228,
   alphaMin: 0.001,
   alphaInitial: 1.0,
+  alphaSimmer: 0.08,
+  dampingSimmer: 0.70,
+  centerGravitySimmer: 0.03,
+  velStopSimmer: 0.3,
 };
 
 // Capability detection. Computed once at module load so the Graph3D dispatcher
@@ -44,6 +48,7 @@ uniform float attraction;
 uniform float damping;
 uniform float centerGravity;
 uniform float maxForce;
+uniform float velStop;
 uniform int nodeCount;
 uniform sampler2D neighborOffsetCount;
 uniform sampler2D neighborList;
@@ -109,12 +114,18 @@ void main() {
   // Center gravity.
   force -= pos * centerGravity;
 
-  // Scale by alpha, cap magnitude.
-  force *= alpha;
+  // Cap raw force magnitude BEFORE alpha scaling so alpha actually scales
+  // the dynamics — high-degree nodes can otherwise sum force vectors large
+  // enough that alpha*force still saturates the cap, making simmer behave
+  // identically to reheat for those hubs and causing runaway orbits.
   float m = length(force);
   if (m > maxForce) force *= (maxForce / m);
+  force *= alpha;
 
   vec3 newVel = (vel + force) * damping;
+  // Static-friction-style clamp: below velStop, snap to zero to kill the
+  // tail of spring oscillations ("strumming"). velStop == 0 disables it.
+  if (velStop > 0.0 && length(newVel) < velStop) newVel = vec3(0.0);
   gl_FragColor = vec4(newVel, 1.0);
 }
 `;
@@ -184,6 +195,7 @@ export function useGpuForceSim(nodes, edges, params = {}) {
   const alphaRef = useRef(cfg.alphaInitial);
   const [alphaDisplay, setAlphaDisplay] = useState(cfg.alphaInitial);
   const frameCounterRef = useRef(0);
+  const simmerRef = useRef(false);
   const gpuStateRef = useRef(null);
 
   useEffect(() => {
@@ -272,6 +284,7 @@ export function useGpuForceSim(nodes, edges, params = {}) {
     vU.damping = { value: cfg.damping };
     vU.centerGravity = { value: cfg.centerGravity };
     vU.maxForce = { value: cfg.maxForce };
+    vU.velStop = { value: 0 };
     vU.nodeCount = { value: nodeCount };
     vU.neighborOffsetCount = { value: offsetCountTex };
     vU.neighborList = { value: neighborTex };
@@ -352,6 +365,16 @@ export function useGpuForceSim(nodes, edges, params = {}) {
     invalidate();
 
     s.velVar.material.uniforms.alpha.value = alpha;
+    // Push the live cfg values into uniforms every frame so React state
+    // changes (physics panel sliders) take effect immediately without
+    // re-initialising the GPU compute state. Simmer-specific variants
+    // override the base values while simmering.
+    s.velVar.material.uniforms.repulsion.value = cfg.repulsion;
+    s.velVar.material.uniforms.attraction.value = cfg.attraction;
+    s.velVar.material.uniforms.maxForce.value = cfg.maxForce;
+    s.velVar.material.uniforms.damping.value = simmerRef.current ? cfg.dampingSimmer : cfg.damping;
+    s.velVar.material.uniforms.centerGravity.value = simmerRef.current ? cfg.centerGravitySimmer : cfg.centerGravity;
+    s.velVar.material.uniforms.velStop.value = simmerRef.current ? cfg.velStopSimmer : 0;
 
     // Compute frame N, then read back frame N-1 from the alternate RT. This
     // keeps CPU and GPU overlapped — the readback no longer stalls the pipeline
@@ -369,7 +392,10 @@ export function useGpuForceSim(nodes, edges, params = {}) {
       out[i * 3 + 2] = buf[i * 4 + 2];
     }
 
-    alphaRef.current = alpha * (1 - cfg.alphaDecay);
+    // Simmer: same exponential decay but floored at alphaSimmer so the sim
+    // never settles into the alpha<alphaMin early-return. Perpetual motion.
+    const decayed = alpha * (1 - cfg.alphaDecay);
+    alphaRef.current = simmerRef.current ? Math.max(cfg.alphaSimmer, decayed) : decayed;
     dirtyRef.current = true;
 
     frameCounterRef.current++;
@@ -386,6 +412,7 @@ export function useGpuForceSim(nodes, edges, params = {}) {
   const freeze = useCallback(() => {
     alphaRef.current = 0;
     setAlphaDisplay(0);
+    simmerRef.current = false;
     // Match the CPU hook: zero velocities so resumes start cold, not coasting.
     const s = gpuStateRef.current;
     if (s) {
@@ -396,5 +423,20 @@ export function useGpuForceSim(nodes, edges, params = {}) {
     invalidate();
   }, [invalidate]);
 
-  return { positionsRef, dirtyRef, alpha: alphaDisplay, reheat, freeze };
+  // Simmer: keep physics running forever at a steady low alpha. Caller passes
+  // an explicit on/off so the UI can mirror state without reading back.
+  const simmer = useCallback(on => {
+    simmerRef.current = on;
+    if (on) {
+      // Nudge alpha up to the simmer floor so the sim isn't stopped.
+      if (alphaRef.current < cfg.alphaSimmer) {
+        alphaRef.current = cfg.alphaSimmer;
+        setAlphaDisplay(cfg.alphaSimmer);
+      }
+      dirtyRef.current = true;
+      invalidate();
+    }
+  }, [cfg.alphaSimmer, invalidate]);
+
+  return { positionsRef, dirtyRef, alpha: alphaDisplay, reheat, freeze, simmer };
 }

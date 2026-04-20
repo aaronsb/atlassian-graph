@@ -3,14 +3,14 @@ import { Canvas } from '@react-three/fiber';
 import { useSchemaGraph } from './hooks/useSchemaGraph.js';
 import { Graph3D } from './scene/Graph3D.jsx';
 import { gpuSimSupported } from './scene/useGpuForceSim.js';
-import { colorFor } from './scene/categoryColors.js';
+import { usePalette } from './scene/palette.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import { QueryPanel } from './QueryPanel.jsx';
 
 const CAP_PRESETS = [250, 500, 1000, 2000, 5000];
 const CAP_MAX = 99999; // effectively "all" — more than the total filtered nodes
 
-function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCap, onReheat, onFreeze }) {
+function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCap, onReheat, onFreeze, onSimmer, simmering }) {
   const offScene = useMemo(() => {
     if (!touchpoints || !knownTypes || knownTypes.size === 0) return 0;
     let n = 0;
@@ -62,12 +62,20 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
         )}
       </div>
 
-      {(selectedId || hoveredId) && (
-        <div style={{ color: '#d7d7e0', fontSize: 11, marginTop: 6, fontFamily: 'SF Mono, Menlo, monospace' }}>
-          {selectedId && <>selected: {selectedId}</>}
-          {!selectedId && hoveredId && <>hover: {hoveredId}</>}
-        </div>
-      )}
+      {/* Always render this row at a fixed height so hovering doesn't
+          flicker the HUD vertically. Width grows naturally with the text. */}
+      <div style={{
+        color: '#d7d7e0',
+        fontSize: 11,
+        marginTop: 6,
+        fontFamily: 'SF Mono, Menlo, monospace',
+        height: 14,
+        lineHeight: '14px',
+      }}>
+        {selectedId ? `selected: ${selectedId}`
+         : hoveredId ? `hover: ${hoveredId}`
+         : '\u00A0'}
+      </div>
 
       {touchpoints && touchpoints.length > 0 && (
         <div style={{ color: '#7aa2f7', fontSize: 11, marginTop: 6 }}>
@@ -148,6 +156,20 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
             ↻ reheat
           </button>
           <button
+            onClick={onSimmer}
+            style={{
+              background: simmering ? '#ff922b' : '#26263a',
+              color: simmering ? '#000' : '#d7d7e0',
+              border: '1px solid ' + (simmering ? '#ff922b' : '#3a3a52'),
+              padding: '2px 8px', borderRadius: 2,
+              fontSize: 10, cursor: 'pointer',
+              fontWeight: simmering ? 600 : 400,
+            }}
+            title={simmering ? 'Simmering — click to stop' : 'Simmer — keep the sim running at a steady low alpha'}
+          >
+            ♨ simmer
+          </button>
+          <button
             onClick={onFreeze}
             style={{
               background: '#26263a', color: '#d7d7e0',
@@ -171,7 +193,136 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
   );
 }
 
+function PhysicsPanel({ physics, setPhysics }) {
+  const defaults = { repulsion: 120, attraction: 0.04, centerGravity: 0.004 };
+  const rows = [
+    { key: 'repulsion',     label: 'repulsion',   min: 0,   max: 400,  step: 1,      hint: 'pushback between nodes' },
+    { key: 'attraction',    label: 'attraction',  min: 0,   max: 0.2,  step: 0.001,  hint: 'edge spring strength' },
+    { key: 'centerGravity', label: 'gravity',     min: 0,   max: 0.05, step: 0.0005, hint: 'pull toward center' },
+  ];
+  const set = (key, value) => setPhysics(p => ({ ...p, [key]: value }));
+  const reset = () => setPhysics(defaults);
+
+  return (
+    <div style={{
+      background: 'rgba(19,19,28,0.9)',
+      border: '1px solid #26263a',
+      padding: '10px 14px',
+      borderRadius: 4,
+      backdropFilter: 'blur(6px)',
+      fontSize: 12,
+      minWidth: 240,
+      maxWidth: 300,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 6,
+      }}>
+        <span style={{ fontWeight: 600 }}>Physics</span>
+        <button
+          onClick={reset}
+          style={{
+            background: '#26263a', color: '#d7d7e0',
+            border: '1px solid #3a3a52',
+            padding: '2px 8px', borderRadius: 2,
+            fontSize: 10, cursor: 'pointer',
+          }}
+          title="Reset physics parameters to their defaults"
+        >
+          reset
+        </button>
+      </div>
+      {rows.map(r => (
+        <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <label
+            title={r.hint}
+            style={{
+              width: 72, color: '#9098b0', fontSize: 10,
+              fontFamily: 'SF Mono, Menlo, monospace',
+            }}
+          >
+            {r.label}
+          </label>
+          <input
+            type="range"
+            min={r.min}
+            max={r.max}
+            step={r.step}
+            value={physics[r.key]}
+            onChange={e => set(r.key, parseFloat(e.target.value))}
+            style={{ flex: 1, accentColor: '#7aa2f7' }}
+          />
+          <span style={{
+            width: 54, textAlign: 'right',
+            fontFamily: 'SF Mono, Menlo, monospace',
+            fontSize: 10, color: '#d7d7e0',
+          }}>
+            {r.step < 1 ? physics[r.key].toFixed(r.step < 0.001 ? 4 : 3) : physics[r.key].toFixed(0)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RampPicker() {
+  const { ramps, activeRampId, setActiveRampId } = usePalette();
+  return (
+    <div style={{
+      background: 'rgba(19,19,28,0.9)',
+      border: '1px solid #26263a',
+      padding: '10px 14px',
+      borderRadius: 4,
+      backdropFilter: 'blur(6px)',
+      fontSize: 12,
+      minWidth: 240,
+      maxWidth: 300,
+    }}>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>Color ramp</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {ramps.map(r => {
+          const isActive = r.id === activeRampId;
+          return (
+            <div
+              key={r.id}
+              onClick={() => setActiveRampId(r.id)}
+              title={`Apply ${r.label}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '4px 6px', borderRadius: 2,
+                cursor: 'pointer',
+                border: '1px solid ' + (isActive ? '#7aa2f7' : 'transparent'),
+                background: isActive ? 'rgba(122,162,247,0.08)' : 'transparent',
+              }}
+              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#26263a'; }}
+              onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <span style={{
+                width: 90,
+                fontFamily: 'SF Mono, Menlo, monospace',
+                fontSize: 10,
+                color: isActive ? '#d7d7e0' : '#9098b0',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                {r.label}
+              </span>
+              <div style={{
+                flex: 1, height: 12, borderRadius: 2,
+                background: r.gradientCss,
+                border: '1px solid rgba(255,255,255,0.08)',
+              }} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function HiddenPanel({ hiddenIds, nodes, onUnhide, onUnhideAll }) {
+  const { colorFor } = usePalette();
   if (hiddenIds.size === 0) return null;
   const byName = new Map();
   if (nodes) for (const n of nodes) byName.set(n.name, n);
@@ -249,7 +400,13 @@ export default function App() {
   const [hoveredId, setHoveredId] = useState(null);
   const [touchpoints, setTouchpoints] = useState([]);
   const [hiddenIds, setHiddenIds] = useState(() => new Set());
-  const simRef = useRef({ reheat: () => {}, freeze: () => {}, alpha: 1 });
+  const [simmering, setSimmering] = useState(false);
+  const [physics, setPhysics] = useState({
+    repulsion: 120,
+    attraction: 0.04,
+    centerGravity: 0.004,
+  });
+  const simRef = useRef({ reheat: () => {}, freeze: () => {}, simmer: () => {}, alpha: 1 });
 
   const knownTypes = useMemo(
     () => new Set(graph.nodes ? graph.nodes.map(n => n.name) : []),
@@ -258,7 +415,17 @@ export default function App() {
 
   const handleTouchpoints = useCallback(tps => setTouchpoints(tps), []);
   const handleReheat = useCallback(() => simRef.current.reheat?.(), []);
-  const handleFreeze = useCallback(() => simRef.current.freeze?.(), []);
+  const handleFreeze = useCallback(() => {
+    setSimmering(false);
+    simRef.current.freeze?.();
+  }, []);
+  const handleSimmer = useCallback(() => {
+    setSimmering(prev => {
+      const next = !prev;
+      simRef.current.simmer?.(next);
+      return next;
+    });
+  }, []);
   // After any visibility change, kick the sim so the layout can re-settle
   // around the new set of participating nodes.
   const handleHide = useCallback(id => {
@@ -327,6 +494,8 @@ export default function App() {
           setCap={setCap}
           onReheat={handleReheat}
           onFreeze={handleFreeze}
+          onSimmer={handleSimmer}
+          simmering={simmering}
         />
         <HiddenPanel
           hiddenIds={hiddenIds}
@@ -334,6 +503,8 @@ export default function App() {
           onUnhide={handleUnhide}
           onUnhideAll={handleUnhideAll}
         />
+        <PhysicsPanel physics={physics} setPhysics={setPhysics} />
+        <RampPicker />
       </div>
       <div
         style={{ position: 'fixed', top: 0, bottom: 320, left: 0, right: 380 }}
@@ -352,6 +523,7 @@ export default function App() {
               hiddenIds={hiddenIds}
               touchpoints={touchpoints}
               simRef={simRef}
+              physics={physics}
             />
           )}
         </Canvas>

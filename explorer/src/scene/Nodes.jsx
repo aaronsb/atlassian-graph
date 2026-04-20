@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { colorFor } from './categoryColors.js';
+import { usePalette } from './palette.jsx';
 
 const tmpMat = new THREE.Matrix4();
 const tmpQuat = new THREE.Quaternion();
@@ -12,6 +12,7 @@ const tmpColor = new THREE.Color();
 export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, onSelect, onHover, onHide, hiddenIds, highlightedTypes }) {
   const meshRef = useRef();
   const invalidate = useThree(state => state.invalidate);
+  const { colorFor } = usePalette();
 
   const scales = useMemo(() => {
     const out = new Float32Array(nodes.length);
@@ -55,7 +56,7 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
     }
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     invalidate();
-  }, [nodes, invalidate]);
+  }, [nodes, invalidate, colorFor]);
 
   return (
     <instancedMesh

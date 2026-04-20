@@ -1,5 +1,5 @@
 import { useTypeDetails, renderTypeRef, unwrapTypeRef } from './hooks/useTypeDetails.js';
-import { colorFor } from './scene/categoryColors.js';
+import { usePalette } from './scene/palette.jsx';
 
 const styles = {
   container: {
@@ -70,6 +70,7 @@ function FieldRow({ field, isLast, knownTypes, onNavigate }) {
 }
 
 export function Sidebar({ selectedId, onNavigate, knownTypes }) {
+  const { colorFor } = usePalette();
   const { loading, error, data } = useTypeDetails(selectedId);
 
   if (!selectedId) {

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { colorFor } from './categoryColors.js';
+import { usePalette } from './palette.jsx';
 
 export function Edges({ nodes, edges, positionsRef, highlightedEdges, hiddenIds }) {
   const geomRef = useRef();
   const invalidate = useThree(state => state.invalidate);
+  const { colorFor } = usePalette();
 
   const { geometry, material, indexPairs, edgeRecords } = useMemo(() => {
     const nodeIndex = new Map();
@@ -76,7 +77,7 @@ export function Edges({ nodes, edges, positionsRef, highlightedEdges, hiddenIds 
     }
     colAttr.needsUpdate = true;
     invalidate();
-  }, [geometry, edgeRecords, indexPairs, nodes, invalidate]);
+  }, [geometry, edgeRecords, indexPairs, nodes, invalidate, colorFor]);
 
   useFrame(() => {
     const positions = positionsRef.current;

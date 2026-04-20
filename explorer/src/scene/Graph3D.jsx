@@ -70,15 +70,15 @@ function Label({ name, positionsRef, index, variant }) {
   );
 }
 
-export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover, onHide, hiddenIds, touchpoints, simRef }) {
-  const sim = useSim(nodes, edges, { hiddenIds });
+export function Graph3D({ nodes, edges, selectedId, hoveredId, onSelect, onHover, onHide, hiddenIds, touchpoints, simRef, physics }) {
+  const sim = useSim(nodes, edges, { hiddenIds, ...physics });
 
   // Expose the sim controls to callers outside the Canvas tree. useForceSim has
   // to live inside Canvas (it calls useFrame), so the App HUD can't call its
   // return value directly — it reads from this ref.
   useEffect(() => {
-    if (simRef) simRef.current = { reheat: sim.reheat, freeze: sim.freeze, alpha: sim.alpha };
-  }, [simRef, sim.reheat, sim.freeze, sim.alpha]);
+    if (simRef) simRef.current = { reheat: sim.reheat, freeze: sim.freeze, simmer: sim.simmer, alpha: sim.alpha };
+  }, [simRef, sim.reheat, sim.freeze, sim.simmer, sim.alpha]);
 
   const nameIndex = useMemo(() => {
     const m = new Map();
