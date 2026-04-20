@@ -59,30 +59,24 @@ export function Edges({ nodes, edges, positionsRef, highlightedEdges, hiddenIds 
     const arr = colAttr.array;
     const sc = new THREE.Color();
     const tc = new THREE.Color();
-    const hasHighlight = highlightedEdges && highlightedEdges.size > 0;
-    const baseDim = 0.25;
-    const dim = hasHighlight ? 0.06 : baseDim;
-    const bright = 1.6;
-
+    // Every edge renders at its palette color (well, its endpoints'). The
+    // material's opacity attenuates from there; no per-edge brightness
+    // multipliers, same principle as the node color effect.
     for (let i = 0; i < edgeRecords.length; i++) {
-      const e = edgeRecords[i];
-      const key = `${e.from}\x01${e.field}\x01${e.to}`;
-      const isHighlighted = hasHighlight && highlightedEdges.has(key);
-      const mul = isHighlighted ? bright : dim;
       const si = indexPairs[i * 2];
       const ti = indexPairs[i * 2 + 1];
       sc.set(colorFor(nodes[si].category));
       tc.set(colorFor(nodes[ti].category));
-      arr[i * 6]     = sc.r * mul;
-      arr[i * 6 + 1] = sc.g * mul;
-      arr[i * 6 + 2] = sc.b * mul;
-      arr[i * 6 + 3] = tc.r * mul;
-      arr[i * 6 + 4] = tc.g * mul;
-      arr[i * 6 + 5] = tc.b * mul;
+      arr[i * 6]     = sc.r;
+      arr[i * 6 + 1] = sc.g;
+      arr[i * 6 + 2] = sc.b;
+      arr[i * 6 + 3] = tc.r;
+      arr[i * 6 + 4] = tc.g;
+      arr[i * 6 + 5] = tc.b;
     }
     colAttr.needsUpdate = true;
     invalidate();
-  }, [geometry, edgeRecords, indexPairs, highlightedEdges, nodes, invalidate]);
+  }, [geometry, edgeRecords, indexPairs, nodes, invalidate]);
 
   useFrame(() => {
     const positions = positionsRef.current;

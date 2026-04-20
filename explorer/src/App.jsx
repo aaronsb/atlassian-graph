@@ -24,14 +24,12 @@ function HUD({ graph, selectedId, hoveredId, touchpoints, knownTypes, cap, setCa
 
   return (
     <div style={{
-      position: 'fixed', top: 12, left: 12,
       background: 'rgba(19,19,28,0.9)',
       border: '1px solid #26263a',
       padding: '10px 14px',
       borderRadius: 4,
       backdropFilter: 'blur(6px)',
       fontSize: 12,
-      zIndex: 10,
       minWidth: 240,
     }}>
       <div style={{ fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>

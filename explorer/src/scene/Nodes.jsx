@@ -77,7 +77,8 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
         if (e.instanceId == null) return;
         const name = nodes[e.instanceId].name;
         if (hiddenIds && hiddenIds.has(name)) return;
-        onSelect?.(name);
+        // Clicking the already-selected node clears selection (toggle).
+        onSelect?.(selectedId === name ? null : name);
       }}
       onContextMenu={e => {
         e.stopPropagation();
