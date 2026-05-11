@@ -43,6 +43,11 @@ export function Nodes({ nodes, positionsRef, dirtyRef, selectedId, hoveredId, on
       mesh.setMatrixAt(i, tmpMat);
     }
     mesh.instanceMatrix.needsUpdate = true;
+    // Refresh the bounding sphere — three.js caches it on first raycast and
+    // never recomputes, so the stale (0,0,0)r=1 geometry sphere causes the
+    // ray-vs-mesh early reject to swallow every pointer event once the sim
+    // moves instances away from origin.
+    mesh.computeBoundingSphere();
   });
 
   useEffect(() => {
