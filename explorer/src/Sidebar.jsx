@@ -1,16 +1,36 @@
 import { useTypeDetails, renderTypeRef, unwrapTypeRef } from './hooks/useTypeDetails.js';
 import { usePalette } from './scene/palette.jsx';
 
+const SIDEBAR_WIDTH = 380;
+const SIDEBAR_COLLAPSED_WIDTH = 32;
+
 const styles = {
   container: {
-    position: 'fixed', top: 0, bottom: 0, right: 0, width: 380,
+    position: 'fixed', top: 0, bottom: 0, right: 0,
     background: '#13131c', borderLeft: '1px solid #26263a',
-    padding: 16, boxSizing: 'border-box',
-    overflowY: 'auto',
+    boxSizing: 'border-box',
     fontSize: 13,
     color: '#d7d7e0',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
     zIndex: 5,
+    display: 'flex', flexDirection: 'column',
+  },
+  body: {
+    flex: 1, overflowY: 'auto', padding: 16,
+  },
+  collapseHandle: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: SIDEBAR_COLLAPSED_WIDTH, height: 60,
+    cursor: 'pointer', userSelect: 'none',
+    color: '#7a7a92', fontSize: 11, letterSpacing: '0.3px',
+    writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+    borderBottom: '1px solid #26263a',
+  },
+  collapseToggle: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '6px 12px', borderBottom: '1px solid #26263a',
+    fontSize: 11, color: '#7a7a92',
+    cursor: 'pointer', userSelect: 'none',
   },
   empty: { color: '#7a7a92', fontSize: 12, fontStyle: 'italic', marginTop: 20 },
   h2: { fontSize: 16, margin: '0 0 6px', wordBreak: 'break-all' },
@@ -69,15 +89,36 @@ function FieldRow({ field, isLast, knownTypes, onNavigate }) {
   );
 }
 
-export function Sidebar({ selectedId, onNavigate, knownTypes }) {
+export function Sidebar({ selectedId, onNavigate, knownTypes, collapsed, setCollapsed }) {
   const { colorFor } = usePalette();
   const { loading, error, data } = useTypeDetails(selectedId);
 
+  if (collapsed) {
+    return (
+      <aside style={{ ...styles.container, width: SIDEBAR_COLLAPSED_WIDTH }}>
+        <div style={styles.collapseHandle} onClick={() => setCollapsed(false)} title="Expand inspector">
+          ▲ INSPECTOR {selectedId ? `· ${selectedId}` : ''}
+        </div>
+      </aside>
+    );
+  }
+
+  const fullStyle = { ...styles.container, width: SIDEBAR_WIDTH };
+  const header = (
+    <div style={styles.collapseToggle} onClick={() => setCollapsed(true)}>
+      <span>INSPECTOR</span>
+      <span>▶ collapse</span>
+    </div>
+  );
+
   if (!selectedId) {
     return (
-      <aside style={styles.container}>
-        <div style={styles.empty}>
-          Click a node to inspect its fields, arguments, and relationships.
+      <aside style={fullStyle}>
+        {header}
+        <div style={{ ...styles.body }}>
+          <div style={styles.empty}>
+            Click a node to inspect its fields, arguments, and relationships.
+          </div>
         </div>
       </aside>
     );
@@ -85,21 +126,23 @@ export function Sidebar({ selectedId, onNavigate, knownTypes }) {
 
   if (loading) {
     return (
-      <aside style={styles.container}>
-        <div style={styles.empty}>Loading {selectedId}…</div>
+      <aside style={fullStyle}>
+        {header}
+        <div style={{ ...styles.body }}><div style={styles.empty}>Loading {selectedId}…</div></div>
       </aside>
     );
   }
 
   if (error) {
     return (
-      <aside style={styles.container}>
-        <div style={{ ...styles.empty, color: '#ff6b9d' }}>Error: {error}</div>
+      <aside style={fullStyle}>
+        {header}
+        <div style={{ ...styles.body }}><div style={{ ...styles.empty, color: '#ff6b9d' }}>Error: {error}</div></div>
       </aside>
     );
   }
 
-  if (!data) return <aside style={styles.container} />;
+  if (!data) return <aside style={fullStyle}>{header}</aside>;
 
   const category = data.category || 'uncategorized';
   const color = colorFor(category);
@@ -108,7 +151,9 @@ export function Sidebar({ selectedId, onNavigate, knownTypes }) {
   const inputFields = data.inputFields || [];
 
   return (
-    <aside style={styles.container}>
+    <aside style={fullStyle}>
+      {header}
+      <div style={styles.body}>
       <span style={styles.kind}>{data.kind}</span>
       <h2 style={styles.h2}>{data.name}</h2>
       <span style={{ ...styles.catBadge, background: color }}>{category}</span>
@@ -163,6 +208,9 @@ export function Sidebar({ selectedId, onNavigate, knownTypes }) {
           ))}
         </>
       )}
+      </div>
     </aside>
   );
 }
+
+export const sidebarWidthFor = (collapsed) => collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;

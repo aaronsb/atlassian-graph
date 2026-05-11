@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 
+export const QUERY_PANEL_HEIGHT = 320;
+export const QUERY_PANEL_COLLAPSED_HEIGHT = 32;
+
 const styles = {
   container: {
-    position: 'fixed', left: 0, right: 380, bottom: 0,
+    position: 'fixed', left: 0, bottom: 0,
     background: '#13131c', borderTop: '1px solid #26263a',
     color: '#d7d7e0', fontSize: 12,
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
@@ -103,9 +106,8 @@ query GetIssue($key: String!, $cloudId: ID!) {
   }
 }`;
 
-export function QueryPanel({ onTouchpointsChange }) {
+export function QueryPanel({ onTouchpointsChange, collapsed, setCollapsed, rightOffset = 0 }) {
   const [query, setQuery] = useState(PLACEHOLDER);
-  const [collapsed, setCollapsed] = useState(false);
   const [parseResult, setParseResult] = useState(null);
   const [runResult, setRunResult] = useState(null);
   const [running, setRunning] = useState(false);
@@ -192,7 +194,7 @@ export function QueryPanel({ onTouchpointsChange }) {
 
   if (collapsed) {
     return (
-      <div style={{ ...styles.container, height: 32 }}>
+      <div style={{ ...styles.container, right: rightOffset, height: QUERY_PANEL_COLLAPSED_HEIGHT }}>
         <div style={styles.header} onClick={() => setCollapsed(false)}>
           <span>QUERY WORKBENCH</span>
           <span style={{ color: '#7a7a92' }}>▲ expand</span>
@@ -202,7 +204,7 @@ export function QueryPanel({ onTouchpointsChange }) {
   }
 
   return (
-    <div style={{ ...styles.container, height: 320 }}>
+    <div style={{ ...styles.container, right: rightOffset, height: QUERY_PANEL_HEIGHT }}>
       <div style={styles.header} onClick={() => setCollapsed(true)}>
         <span>QUERY WORKBENCH {touchpoints.length > 0 && <span style={{ color: '#7a7a92' }}>· {touchpoints.length} touchpoints</span>}</span>
         <span style={{ color: '#7a7a92' }}>▼ collapse</span>

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useSchemaGraph } from './hooks/useSchemaGraph.js';
 import { Graph3D } from './scene/Graph3D.jsx';
-import { Sidebar } from './Sidebar.jsx';
-import { QueryPanel } from './QueryPanel.jsx';
+import { Sidebar, sidebarWidthFor } from './Sidebar.jsx';
+import { QueryPanel, QUERY_PANEL_HEIGHT, QUERY_PANEL_COLLAPSED_HEIGHT } from './QueryPanel.jsx';
 import { HUD } from './panels/HUD.jsx';
 import { HiddenPanel } from './panels/HiddenPanel.jsx';
 import { PhysicsPanel } from './panels/PhysicsPanel.jsx';
@@ -17,6 +17,8 @@ export default function App() {
   const [touchpoints, setTouchpoints] = useState([]);
   const [hiddenIds, setHiddenIds] = useState(() => new Set());
   const [simmering, setSimmering] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [queryCollapsed, setQueryCollapsed] = useState(false);
   const [physics, setPhysics] = useState({
     repulsion: 120,
     attraction: 0.04,
@@ -123,7 +125,12 @@ export default function App() {
         <RampPicker />
       </div>
       <div
-        style={{ position: 'fixed', top: 0, bottom: 320, left: 0, right: 380 }}
+        style={{
+          position: 'fixed', top: 0, left: 0,
+          right: sidebarWidthFor(sidebarCollapsed),
+          bottom: queryCollapsed ? QUERY_PANEL_COLLAPSED_HEIGHT : QUERY_PANEL_HEIGHT,
+          transition: 'right 180ms ease, bottom 180ms ease',
+        }}
         onContextMenu={e => e.preventDefault()}
       >
         <Canvas frameloop="demand" flat camera={{ position: [0, 0, 300], fov: 55, far: 10000 }}>
@@ -148,8 +155,15 @@ export default function App() {
         selectedId={selectedId}
         onNavigate={setSelectedId}
         knownTypes={knownTypes}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
       />
-      <QueryPanel onTouchpointsChange={handleTouchpoints} />
+      <QueryPanel
+        onTouchpointsChange={handleTouchpoints}
+        collapsed={queryCollapsed}
+        setCollapsed={setQueryCollapsed}
+        rightOffset={sidebarWidthFor(sidebarCollapsed)}
+      />
     </>
   );
 }
