@@ -56,7 +56,7 @@ traverse({ from: "JiraQuery", strategy: "breadth", max_depth: 2,
   }
 ```
 
-The agent reads `frontier` (cheap, bounded) and decides whether to call `traverse` again from a chosen node — iterative deepening, not a subgraph dump. `path` behavior is `traverse` with `to` set: it returns the field-chain in `expanded` and omits `frontier`.
+The agent reads `frontier` (cheap, bounded) and decides whether to call `traverse` again from a chosen node — iterative deepening, not a subgraph dump. `path` behavior is `traverse` with `to` set: it returns the field-chain in `steps` (matching the existing `/api/path` shape: `{from, field, to}` triples) and omits `frontier`. Path mode is out-direction only and filter-blind; the service rejects `to` combined with a non-`out` direction or a `kind`/`category` filter rather than silently ignoring them.
 
 **Safety boundary lives in the core, never the frontend.** `run_query` is gated by an operation-type parser in `explorer-server.js` (the existing `POST /api/parse-query` already classifies operations). The policy, decided here (not left as a hint):
 

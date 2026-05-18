@@ -287,6 +287,16 @@ app.get('/api/traverse/:from', (req, res) => {
   if (req.query.to && !index.getType(req.query.to.toString())) {
     return res.status(404).json({ error: `Target type not found: ${req.query.to}` });
   }
+  // Path mode (`to`) reuses out-only, filter-blind shortestPath. Reject the
+  // combinations it would silently ignore rather than return a misleading
+  // answer (review of PR #7).
+  const dir = (req.query.direction || 'out').toString();
+  if (req.query.to && (dir !== 'out' || req.query.kind || req.query.category)) {
+    return res.status(400).json({
+      error: 'Path mode (`to`) is out-direction only and ignores filters. '
+        + 'Remove `to`, or drop `direction`/`kind`/`category`.',
+    });
+  }
   const filter = {};
   if (req.query.kind) filter.kind = req.query.kind.toString().toUpperCase();
   if (req.query.category) filter.category = req.query.category.toString();
@@ -418,6 +428,11 @@ app.post('/api/query', async (req, res) => {
     return res.status(400).json({ error: 'Query parse error: ' + err.message });
   }
   const ops = document.definitions.filter(d => d.kind === 'OperationDefinition');
+  if (ops.length === 0) {
+    return res.status(400).json({
+      error: 'No GraphQL operation found (fragment-only or empty document); nothing to execute.',
+    });
+  }
   const forbidden = ops.filter(o => o.operation !== 'query');
   if (forbidden.length) {
     const kinds = [...new Set(forbidden.map(o => o.operation))].join(', ');
