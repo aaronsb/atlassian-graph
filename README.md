@@ -4,7 +4,9 @@ A 3D visualizer for Atlassian's federated GraphQL schema, with an interactive qu
 
 ## Status
 
-Exploratory but functional. The explorer renders 25,464 types / 65,408 edges (capped to the top 500 by connectivity for display), indexes them in memory for sub-10ms lookups, and supports a real query → parse → highlight → run → save loop.
+Exploratory but functional. The explorer renders 26,353 types / 67,703 edges (capped to the top 500 by connectivity for display), indexes them in memory for sub-10ms lookups, and supports a real query → parse → highlight → run → save loop.
+
+There is also an **agent-facing query service** over the *entire* federated graph (not a curated subgraph) — a small set of abstracted primitives (`search`, `type`, `traverse`, `query`) exposed through a thin CLI today, promotable to an MCP server later. See [ADR-100](docs/architecture/core/ADR-100-agent-facing-graph-query-service-over-the-full-federated-schema-cli-first-mcp-later.md).
 
 The previous generation of this repo was an MCP server that auto-generated thousands of tools by introspection. That experiment was removed because the tool wall was unusable; see git history if you want the archaeology.
 
@@ -44,6 +46,9 @@ explorer/                     Vite + React + React Three Fiber frontend on :5173
 └── src/App.jsx               Composition
 introspection-schema.json     Cached schema (gitignored)
 specs/                        Saved query specs — the input to the MCP factory
+cli/                          Thin TypeScript client over :4000 (ADR-100) —
+                              search | type | traverse | query; MCP server later
+docs/architecture/            ADRs (managed by docs/scripts/adr, vendored)
 ```
 
 ## API reference (port 4000)
@@ -61,9 +66,10 @@ Claude-friendly introspection — everything answers in ~10ms from in-memory ind
 | `/api/consumers/:type` | Every field that takes this type as an argument |
 | `/api/entry-points/:type?from=Query&maxHops=2` | BFS from a root type — finds all paths including namespace traversals like `Query.jira → JiraQuery.issueByKey` |
 | `/api/path?from=&to=` | Shortest field-chain between two types |
+| `/api/traverse/:from?strategy=breadth\|depth&depth=&direction=&category=&kind=&to=&limit=` | ADR-100 unified navigation. Subsumes neighbors/entry-points/path. Returns bounded `expanded` + summarized `frontier` (counts by kind/category) + `elided_cycles` — progressive disclosure for a high-fan-out graph |
 | `/api/stats` | Type counts, degree distribution, most-connected types |
 | `/api/graph?cap=&kinds=&includeRelay=` | Pre-filtered nodes + edges for the viz |
-| `POST /api/query` | Live GraphQL proxy. Accepts `{query, variables, operationName}`, auth is added server-side. Returns the upstream response with `elapsed` attached. |
+| `POST /api/query` | Live GraphQL proxy. Accepts `{query, variables, operationName}`, auth is added server-side. Returns the upstream response with `elapsed` attached. **Read-only (ADR-100):** the core rejects `mutation`/`subscription` before reaching upstream, so every frontend inherits the boundary. |
 | `POST /api/parse-query` | Schema-aware parse. Returns `{ok, operations, touchpoints}` where touchpoints are `{parentType, field, returns}` triples walked through the selection set. |
 | `/api/query-log` | Recent POST /api/query trace (in-memory ring buffer, 50 entries) |
 | `/api/specs` · `GET/POST/DELETE /api/specs/:name[/queries]` | Spec file CRUD |
