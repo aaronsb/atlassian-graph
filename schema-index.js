@@ -277,6 +277,100 @@ export function createIndex(schemaData) {
       }
       return { steps };
     },
+
+    // Unified graph navigation with progressive disclosure (ADR-100).
+    // Subsumes neighbors/entry-points/path. Returns a bounded `expanded`
+    // set plus a summarized `frontier` so a cyclic, high-fan-out schema
+    // stays navigable: the caller deepens where it cares and gets cheap
+    // aggregate signal everywhere else.
+    traverse(from, opts = {}) {
+      if (!byName.has(from)) return null;
+      const strategy = opts.strategy === 'depth' ? 'depth' : 'breadth';
+      const maxDepth = Math.min(Math.max(parseInt(opts.maxDepth ?? 2, 10) || 2, 1), 6);
+      const direction = ['out', 'in', 'both'].includes(opts.direction) ? opts.direction : 'out';
+      const nodeLimit = Math.min(Math.max(parseInt(opts.nodeLimit ?? 50, 10) || 50, 1), 500);
+      const filter = opts.filter || null;
+
+      const matchFilter = (name) => {
+        if (!filter) return true;
+        if (filter.kind && byName.get(name)?.kind !== filter.kind) return false;
+        if (filter.category && categorize(name) !== filter.category) return false;
+        return true;
+      };
+      const neigh = (type) => {
+        const res = [];
+        if (direction !== 'in') {
+          for (const e of outgoingByType.get(type) || []) res.push({ via: `${type}.${e.field}`, other: e.to });
+        }
+        if (direction !== 'out') {
+          for (const p of byReturnType.get(type) || []) {
+            if (p.parent !== type) res.push({ via: `${p.parent}.${p.field}`, other: p.parent });
+          }
+        }
+        return res;
+      };
+
+      // Path mode: traverse with a target collapses to shortest field-chain
+      // (out-direction, mirrors shortestPath) and omits the frontier.
+      if (opts.to) {
+        if (!byName.has(opts.to)) return { mode: 'path', from, to: opts.to, found: false, steps: [] };
+        const p = this.shortestPath(from, opts.to);
+        if (!p) return { mode: 'path', from, to: opts.to, found: false, steps: [] };
+        return { mode: 'path', from, to: opts.to, found: true, length: p.steps.length, steps: p.steps };
+      }
+
+      const visited = new Set([from]);
+      const expanded = [];
+      const frontierSet = new Set();
+      const elided = new Set();
+      let truncated = false;
+
+      const work = [{ type: from, depth: 0 }];
+      while (work.length) {
+        const { type, depth } = strategy === 'depth' ? work.pop() : work.shift();
+        if (depth >= maxDepth) {
+          for (const n of neigh(type)) if (!visited.has(n.other)) frontierSet.add(n.other);
+          continue;
+        }
+        for (const n of neigh(type)) {
+          if (visited.has(n.other)) { elided.add(n.other); continue; }
+          visited.add(n.other);
+          if (!matchFilter(n.other)) { frontierSet.add(n.other); continue; }
+          if (expanded.length >= nodeLimit) { truncated = true; frontierSet.add(n.other); continue; }
+          expanded.push({ type: n.other, depth: depth + 1, via: n.via });
+          work.push({ type: n.other, depth: depth + 1 });
+        }
+      }
+
+      const byKind = {};
+      const byCat = {};
+      for (const name of frontierSet) {
+        const k = isRelayScaffold(name) ? '*Connection/Edge' : (byName.get(name)?.kind || 'UNKNOWN');
+        byKind[k] = (byKind[k] || 0) + 1;
+        const c = categorize(name);
+        byCat[c] = (byCat[c] || 0) + 1;
+      }
+
+      return {
+        mode: 'traverse',
+        from,
+        strategy,
+        max_depth: maxDepth,
+        direction,
+        filter,
+        node_limit: nodeLimit,
+        expanded,
+        frontier: {
+          total: frontierSet.size,
+          by_kind: byKind,
+          by_category: byCat,
+          sample: [...frontierSet].slice(0, 25),
+        },
+        truncated,
+        elided_cycles: [...elided].slice(0, 25),
+        elided_cycles_total: elided.size,
+      };
+    },
   };
 }
 

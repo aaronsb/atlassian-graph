@@ -278,6 +278,30 @@ app.get('/api/path', (req, res) => {
   res.json({ from, to, found: true, length: path.steps.length, steps: path.steps });
 });
 
+// Unified graph navigation (ADR-100). Subsumes neighbors/entry-points/path
+// with progressive disclosure: bounded `expanded` + summarized `frontier`.
+app.get('/api/traverse/:from', (req, res) => {
+  if (!index.getType(req.params.from)) {
+    return res.status(404).json({ error: `Type not found: ${req.params.from}` });
+  }
+  if (req.query.to && !index.getType(req.query.to.toString())) {
+    return res.status(404).json({ error: `Target type not found: ${req.query.to}` });
+  }
+  const filter = {};
+  if (req.query.kind) filter.kind = req.query.kind.toString().toUpperCase();
+  if (req.query.category) filter.category = req.query.category.toString();
+  const result = index.traverse(req.params.from, {
+    strategy: (req.query.strategy || 'breadth').toString(),
+    maxDepth: req.query.depth,
+    direction: (req.query.direction || 'out').toString(),
+    nodeLimit: req.query.limit,
+    filter: Object.keys(filter).length ? filter : null,
+    to: req.query.to ? req.query.to.toString() : null,
+  });
+  if (!result) return res.status(404).json({ error: `Type not found: ${req.params.from}` });
+  res.json(result);
+});
+
 app.get('/api/category/:name', (req, res) => {
   const arr = index.categoryIndex.get(req.params.name);
   if (!arr) return res.status(404).json({ error: `Category not found: ${req.params.name}` });
@@ -383,6 +407,27 @@ app.post('/api/query', async (req, res) => {
   if (!query || typeof query !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid query string' });
   }
+
+  // ADR-100 read/mutation boundary. Enforced here in the core service so
+  // every frontend (CLI, future MCP, GUI) inherits it and none can bypass
+  // it. v1: run_query is read-only — reject anything that isn't a `query`.
+  let document;
+  try {
+    document = parse(query);
+  } catch (err) {
+    return res.status(400).json({ error: 'Query parse error: ' + err.message });
+  }
+  const ops = document.definitions.filter(d => d.kind === 'OperationDefinition');
+  const forbidden = ops.filter(o => o.operation !== 'query');
+  if (forbidden.length) {
+    const kinds = [...new Set(forbidden.map(o => o.operation))].join(', ');
+    return res.status(403).json({
+      error: `run_query is read-only (ADR-100): rejected ${kinds} operation(s). `
+        + `Mutations and subscriptions are out of scope in v1; a future mutation `
+        + `path requires the GRAPH_ALLOW_MUTATIONS server env var and a distinct run_mutation tool.`,
+    });
+  }
+
   const email = process.env.ATLASSIAN_EMAIL;
   const apiToken = process.env.ATLASSIAN_API_TOKEN;
   if (!email || !apiToken) {

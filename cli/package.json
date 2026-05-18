@@ -1,0 +1,20 @@
+{
+  "name": "atlassian-graph-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin CLI client over the atlassian-graph service (ADR-100). Promotes to an MCP server later via a new entry point.",
+  "bin": {
+    "graph-cli": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2"
+  }
+}
